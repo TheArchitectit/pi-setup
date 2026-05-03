@@ -1,34 +1,103 @@
 # Pi Setup Wizard
 
-A friendly installer for [Pi](https://pi.dev/) - the minimal terminal coding harness.
+Interactive configuration wizard for Pi - the minimal terminal coding harness.
 
-## Features
+## Usage
 
-- **Auto-detects** Node.js and npm
-- **Flexible install** - global (if permissions) or local (user directory)
-- **Dev setup** - TypeScript support, extensions, skills
-- **Config wizard** - Interactive setup for model, auto-save, telemetry
+```bash
+# Run setup (interactive)
+pi setup
+
+# Or run directly
+./setup.sh
+```
+
+## What It Configures
+
+| Setting | Description | Saved To |
+|---------|-------------|----------|
+| **Default Model** | LLM provider (claude, openai, ollama, custom) | `~/.config/pi/config.json` |
+| **Auto-save** | Automatically save sessions | `~/.config/pi/config.json` |
+| **Telemetry** | Usage analytics | `~/.config/pi/config.json` |
+| **Extensions** | Enable/disable extensions | `~/.config/pi/config.json` |
+| **Sample Skill** | Create hello world skill | `~/.config/pi/skills/hello.json` |
 
 ## Quick Start
 
 ```bash
-./install.sh
+# 1. Run setup
+pi setup
+
+# 2. Add API key to shell profile
+export ANTHROPIC_API_KEY="your-key"
+
+# 3. Start pi
+pi
 ```
 
-## Options
+## Shell Alias (Recommended)
+
+Add to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-./install.sh --dev      # Setup development environment
-./install.sh --config   # Run configuration wizard
-./install.sh --uninstall
+pi() {
+    if [ "$1" = "setup" ]; then
+        bash /path/to/pi-setup/setup.sh
+    else
+        command pi "$@"
+    fi
+}
 ```
 
-## What is Pi?
+## Manual Configuration
 
-Pi is a minimal terminal coding harness that you can extend with:
-- TypeScript extensions
-- Skills (prompt templates)
-- Themes
-- Pi packages
+Edit `~/.config/pi/config.json`:
 
-Learn more: https://pi.dev/docs/latest
+```json
+{
+  "defaultModel": "claude",
+  "autoSave": true,
+  "telemetry": false,
+  "extensions": [],
+  "skills": ["hello"]
+}
+```
+
+## API Keys
+
+Pi reads API keys from environment variables:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export XAI_API_KEY="..."
+```
+
+## Creating Skills
+
+```bash
+# Create a new skill
+pi --create-skill my-skill
+
+# Or manually create ~/.config/pi/skills/my-skill.json:
+{
+  "name": "my-skill",
+  "description": "What this skill does",
+  "prompt": "System prompt here"
+}
+```
+
+## Creating Extensions
+
+Extensions are TypeScript files in `~/.config/pi/extensions/`:
+
+```typescript
+// my-ext.ts
+export default {
+  name: 'my-ext',
+  onCommand: (cmd: string) => {
+    // Handle commands
+  }
+};
+```
