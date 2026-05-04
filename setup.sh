@@ -22,21 +22,28 @@ print_banner() {
     printf "  Configure models, extensions, and preferences\n\n"
 }
 
+# Strip ANSI color codes from string
+strip_ansi() {
+    echo "$1" | sed 's/\x1b\[[0-9;]*m//g'
+}
+
 read_input() {
     local prompt="$1"
     local default="${2:-}"
 
+    # Print prompt to stderr so it doesn't contaminate stdout
     if [ -n "$default" ]; then
-        ask "$prompt [$default]"
+        ask "$prompt [$default]" >&2
     else
-        ask "$prompt"
+        ask "$prompt" >&2
     fi
 
     read -r input
     if [ -z "$input" ] && [ -n "$default" ]; then
         input="$default"
     fi
-    echo "$input"
+    # Strip any ANSI codes that might have been captured
+    strip_ansi "$input"
 }
 
 read_bool() {
