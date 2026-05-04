@@ -176,12 +176,6 @@ EOF
 main() {
     print_banner
 
-    # Check if running in terminal
-    if [ ! -t 0 ]; then
-        echo "Error: Setup wizard requires an interactive terminal"
-        exit 1
-    fi
-
     # Config directory
     PI_CONFIG_DIR="${PI_CONFIG_DIR:-$HOME/.config/pi}"
 
