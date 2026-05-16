@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate extension syntax
+        run: node --check extensions/setup.ts
+
+      - name: Validate JSON config files
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('package.json'))"
+          echo "package.json: valid"
+
+      - name: Validate shell script syntax
+        run: bash -n setup.sh && echo "setup.sh: valid syntax"
+
+      - name: Check package.json version
+        run: node -e "const p = JSON.parse(require('fs').readFileSync('package.json')); console.log('Version:', p.version);"
+
+  test-extension:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Verify extension loads
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const code = readFileSync('extensions/setup.ts', 'utf-8');
+            // Verify the extension exports activate and deactivate
+            if (!code.includes('export async function activate')) {
+              throw new Error('Missing activate export');
+            }
+            if (!code.includes('export async function deactivate')) {
+              throw new Error('Missing deactivate export');
+            }
+            console.log('Extension structure: valid');
+          "
+
+      - name: Verify pi config file paths
+        run: |
+          node -e "
+            const code = require('fs').readFileSync('extensions/setup.ts', 'utf-8');
+            const expected = ['.pi', 'agent', 'models.json', 'auth.json', 'settings.json'];
+            for (const str of expected) {
+              if (!code.includes(str)) {
+                throw new Error('Missing expected path component: ' + str);
+              }
+            }
+            console.log('Config paths: valid');
+          "
+
+  test-shell-script:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell script
+        run: |
+          bash -n setup.sh
+          echo "setup.sh: syntax valid on ${{ matrix.os }}"
+
+      - name: Shell script is executable
+        run: test -x setup.sh && echo "executable: yes"
+
+      - name: Validate shell script structure
+        run: |
+          grep -q "set -euo pipefail" setup.sh || { echo "Missing set -euo pipefail"; exit 1; }
+          grep -q "config_models()" setup.sh || { echo "Missing config_models function"; exit 1; }
+          grep -q "config_providers()" setup.sh || { echo "Missing config_providers function"; exit 1; }
+          echo "Shell script structure: valid"

@@ -1,0 +1,46 @@
+{
+  "name": "pi-setup",
+  "version": "0.0.1-alpha.1",
+  "description": "Setup wizard for pi — configure providers, models, and defaults via /setup command",
+  "type": "module",
+  "license": "MIT",
+  "author": "TheArchitectit",
+  "homepage": "https://github.com/TheArchitectit/pi-setup",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheArchitectit/pi-setup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TheArchitectit/pi-setup/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "setup",
+    "configuration",
+    "wizard",
+    "providers",
+    "models",
+    "llm",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "extensions",
+    "setup.sh",
+    "install.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/setup.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

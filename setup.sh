@@ -50,9 +50,11 @@ read_bool() {
     local prompt="$1"
     local default="${2:-y}"
 
-    ask "$prompt (y/n) [$default]"
+    ask "$prompt (y/n) [$default]" >&2
     read -r input
     input="${input:-$default}"
+    # Strip any ANSI codes that might have been captured
+    input=$(strip_ansi "$input")
 
     case "$input" in
         [Yy]|[Yy]es) echo "true" ;;
@@ -132,9 +134,30 @@ EOF
     fi
 }
 
+configure_custom_endpoint() {
+    if [ "$DEFAULT_MODEL" != "custom" ]; then
+        return
+    fi
+
+    printf "\n${BOLD}Custom Endpoint Configuration:${RESET}\n"
+
+    CUSTOM_NAME=$(read_input "Provider name" "Custom")
+    CUSTOM_URL=$(read_input "API Base URL" "http://localhost:11434/v1")
+    CUSTOM_KEY=$(read_input "API Key (optional)" "")
+    CUSTOM_MODEL=$(read_input "Model ID" "gpt-4")
+
+    ok "Custom endpoint configured"
+}
+
 configure_api_keys() {
     printf "\n${BOLD}API Keys:${RESET}\n"
     info "Pi reads API keys from environment variables"
+
+    # For custom model, we configured the key already
+    if [ "$DEFAULT_MODEL" = "custom" ]; then
+        ok "Custom endpoint configured with key"
+        return
+    fi
 
     # Check current env
     local keys_found=()

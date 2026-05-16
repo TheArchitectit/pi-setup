@@ -1,103 +1,345 @@
-# Pi Setup Wizard
+# pi-setup
 
-Interactive configuration wizard for Pi - the minimal terminal coding harness.
+Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the minimal terminal coding harness.
 
-## Usage
+Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
+
+> **Status:** Alpha (v0.0.1-alpha.1) — API may change between releases.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Extension Mode](#extension-mode)
+  - [Shell Script Mode](#shell-script-mode)
+- [Configuration Reference](#configuration-reference)
+  - [Config Files](#config-files)
+  - [Provider Schema](#provider-schema)
+  - [Model Schema](#model-schema)
+  - [Settings Schema](#settings-schema)
+- [Supported Providers](#supported-providers)
+- [API Keys](#api-keys)
+- [How It Works](#how-it-works)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Features
+
+- **Interactive `/setup` command** — runs inside pi using built-in UI dialogs (select, input, confirm)
+- **Standalone shell wizard** — bootstrap config before pi is even installed
+- **Auto-registration** — saved providers are loaded on pi startup automatically
+- **Multi-provider support** — Anthropic, OpenAI, Google, XAI, OpenCode, Ollama, LM Studio, and custom endpoints
+- **Model management** — add, edit, and remove models per provider
+- **Default model selection** — set your preferred model and thinking level
+- **Secure auth storage** — API key references saved with `0600` permissions
+
+---
+
+## Installation
+
+### Option 1: Copy the Extension (recommended)
 
 ```bash
-# Run setup (interactive)
-pi setup
+# Copy the setup extension into your pi extensions directory
+mkdir -p ~/.pi/agent/extensions
+cp extensions/setup.ts ~/.pi/agent/extensions/
+```
 
-# Or run directly
+### Option 2: Clone the Repo
+
+```bash
+git clone https://github.com/TheArchitectit/pi-setup.git
+cd pi-setup
+# Then copy the extension:
+cp extensions/setup.ts ~/.pi/agent/extensions/
+```
+
+### Option 3: Shell Script Only
+
+If you just want the standalone setup wizard (no pi extension):
+
+```bash
+git clone https://github.com/TheArchitectit/pi-setup.git
+cd pi-setup
+chmod +x setup.sh
 ./setup.sh
 ```
 
-## What It Configures
+### Prerequisites
 
-| Setting | Description | Saved To |
-|---------|-------------|----------|
-| **Default Model** | LLM provider (claude, openai, ollama, custom) | `~/.config/pi/config.json` |
-| **Auto-save** | Automatically save sessions | `~/.config/pi/config.json` |
-| **Telemetry** | Usage analytics | `~/.config/pi/config.json` |
-| **Extensions** | Enable/disable extensions | `~/.config/pi/config.json` |
-| **Sample Skill** | Create hello world skill | `~/.config/pi/skills/hello.json` |
+- **Node.js 18+** (for the extension)
+- **pi** installed globally (`npm install -g pi` or via [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent))
+- **bash** (for the shell script mode)
 
-## Quick Start
+---
 
-```bash
-# 1. Run setup
-pi setup
+## Usage
 
-# 2. Add API key to shell profile
-export ANTHROPIC_API_KEY="your-key"
+### Extension Mode
 
-# 3. Start pi
+After installing the extension, start pi and run the `/setup` command:
+
+```
 pi
+/setup
 ```
 
-## Shell Alias (Recommended)
+The wizard walks you through:
 
-Add to `~/.bashrc` or `~/.zshrc`:
+1. **Provider management** — add, edit, or remove LLM providers
+2. **Model configuration** — configure models for each provider
+3. **Default model** — choose which model pi uses by default
+4. **Thinking level** — set default reasoning depth (off / minimal / low / medium / high / xhigh)
+
+The wizard uses pi's built-in dialog system — select lists, text inputs, and confirmation prompts.
+
+#### What Happens Behind the Scenes
+
+- Provider configs are saved to `~/.pi/agent/models.json`
+- API key references are saved to `~/.pi/agent/auth.json` (file permissions: `0600`)
+- Settings (default model, thinking level) are saved to `~/.pi/agent/settings.json`
+- Providers are immediately registered in the current pi session
+
+### Shell Script Mode
+
+Run the standalone wizard without pi installed:
 
 ```bash
-pi() {
-    if [ "$1" = "setup" ]; then
-        bash /path/to/pi-setup/setup.sh
-    else
-        command pi "$@"
-    fi
-}
+./setup.sh
 ```
 
-## Manual Configuration
+The shell wizard:
 
-Edit `~/.config/pi/config.json`:
+1. Checks for pi and its config directory
+2. Prompts you to configure providers
+3. Asks for API keys (stored as environment variable references)
+4. Lists and selects available models
+5. Writes the config files that pi reads on startup
+
+---
+
+## Configuration Reference
+
+### Config Files
+
+| File | Purpose | Permissions |
+|------|---------|-------------|
+| `~/.pi/agent/models.json` | Provider and model definitions | `0644` |
+| `~/.pi/agent/auth.json` | API key environment variable references | `0600` |
+| `~/.pi/agent/settings.json` | Default model, thinking level, provider | `0644` |
+
+### Provider Schema
+
+Each provider in `models.json` follows this structure:
 
 ```json
 {
-  "defaultModel": "claude",
-  "autoSave": true,
-  "telemetry": false,
-  "extensions": [],
-  "skills": ["hello"]
+  "providers": {
+    "provider-name": {
+      "name": "Display Name",
+      "models": [
+        {
+          "id": "model-id",
+          "name": "Display Name",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 3,
+            "output": 15,
+            "cacheRead": 0.3,
+            "cacheWrite": 3.75
+          },
+          "contextWindow": 200000,
+          "maxTokens": 16384,
+          "thinkingLevelMap": {
+            "off": 0,
+            "minimal": 1,
+            "low": 2,
+            "medium": 3,
+            "high": 4,
+            "xhigh": 5
+          }
+        }
+      ]
+    }
+  }
 }
 ```
+
+### Model Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Model identifier sent to the API |
+| `name` | `string` | Human-readable display name |
+| `reasoning` | `boolean` | Whether the model supports extended thinking |
+| `input` | `string[]` | Supported input types (`"text"`, `"image"`) |
+| `cost` | `object` | Per-token pricing (USD) |
+| `cost.input` | `number` | Cost per 1M input tokens |
+| `cost.output` | `number` | Cost per 1M output tokens |
+| `cost.cacheRead` | `number` | Cost per 1M cached input tokens |
+| `cost.cacheWrite` | `number` | Cost per 1M cache write tokens |
+| `contextWindow` | `number` | Maximum context window in tokens |
+| `maxTokens` | `number` | Maximum output tokens |
+| `thinkingLevelMap` | `object` | Mapping of thinking level names to API values |
+
+### Settings Schema
+
+```json
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-20250514",
+  "defaultThinkingLevel": "high"
+}
+```
+
+| Field | Type | Values |
+|-------|------|--------|
+| `defaultProvider` | `string` | Provider name key |
+| `defaultModel` | `string` | Model ID |
+| `defaultThinkingLevel` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+
+---
+
+## Supported Providers
+
+| Provider | API Type | Notes |
+|----------|----------|-------|
+| **Anthropic** | `anthropic-messages` | Claude models, requires `ANTHROPIC_API_KEY` |
+| **OpenAI** | `openai-responses` | GPT and o-series models, requires `OPENAI_API_KEY` |
+| **Google** | `google-genai` | Gemini models, requires `GOOGLE_GENERATIVE_AI_API_KEY` |
+| **XAI** | `openai-completions` | Grok models, requires `XAI_API_KEY` |
+| **OpenCode** | `anthropic-messages` | Gemini via OpenCode proxy, requires `OPENCODE_API_KEY` |
+| **Ollama** | `openai-chat` | Local models, no API key needed, default: `http://localhost:11434/v1` |
+| **LM Studio** | `openai-chat` | Local models, no API key needed, default: `http://localhost:1234/v1` |
+| **Custom** | any | Any OpenAI-compatible or Anthropic-compatible endpoint |
+
+---
 
 ## API Keys
 
-Pi reads API keys from environment variables:
+Pi reads API keys from **environment variables**. Add these to your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`):
 
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
+# Anthropic (required for Claude models)
 export ANTHROPIC_API_KEY="sk-ant-..."
+
+# OpenAI (required for GPT/o-series models)
 export OPENAI_API_KEY="sk-..."
-export XAI_API_KEY="..."
+
+# Google (required for Gemini models)
+export GOOGLE_GENERATIVE_AI_API_KEY="..."
+
+# XAI (required for Grok models)
+export XAI_API_KEY="xai-..."
+
+# OpenCode (required for Gemini via OpenCode)
+export OPENCODE_API_KEY="..."
 ```
 
-## Creating Skills
+After adding, reload your shell:
 
 ```bash
-# Create a new skill
-pi --create-skill my-skill
-
-# Or manually create ~/.config/pi/skills/my-skill.json:
-{
-  "name": "my-skill",
-  "description": "What this skill does",
-  "prompt": "System prompt here"
-}
+source ~/.bashrc  # or ~/.zshrc
 ```
 
-## Creating Extensions
+**Security note:** The extension stores environment variable *names* in `auth.json`, not the actual keys. The file is written with `0600` permissions (owner read/write only).
 
-Extensions are TypeScript files in `~/.config/pi/extensions/`:
+---
 
-```typescript
-// my-ext.ts
-export default {
-  name: 'my-ext',
-  onCommand: (cmd: string) => {
-    // Handle commands
-  }
-};
+## How It Works
+
+### Extension Lifecycle
+
+1. **Startup:** When pi loads, the extension's `activate()` function runs. It reads `~/.pi/agent/models.json` and calls `pi.registerProvider()` for each saved provider, making them immediately available.
+
+2. **`/setup` command:** The registered command launches the interactive wizard. All changes are persisted to disk and registered in the current session.
+
+3. **Session registration:** Providers are registered via pi's `registerProvider()` API with the correct `baseUrl`, `apiKey` env var reference, `api` type, and model definitions.
+
+### Standalone Script
+
+The `setup.sh` script is independent of pi. It:
+
+1. Detects or creates `~/.pi/agent/`
+2. Reads existing config to preserve custom entries
+3. Walks through provider and model configuration interactively
+4. Writes `models.json` and `auth.json`
+
+---
+
+## Testing
+
+Since this is an alpha release, we need your help testing. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing instructions.
+
+### Quick Test
+
+```bash
+# 1. Install the extension
+cp extensions/setup.ts ~/.pi/agent/extensions/
+
+# 2. Start pi
+pi
+
+# 3. Run the setup wizard
+/setup
+
+# 4. Add a provider (e.g., Anthropic)
+#    - Enter base URL: https://api.anthropic.com
+#    - Select API: anthropic-messages
+#    - Set env var: ANTHROPIC_API_KEY
+#    - Add models
+
+# 5. Verify providers registered
+#    The extension should show notifications as providers load
+
+# 6. Test default model selection
+#    Re-run /setup and select a default model
+
+# 7. Test thinking level
+#    Re-run /setup and change thinking level
 ```
+
+### Test Matrix
+
+| Test Case | Steps | Expected Result |
+|-----------|-------|-----------------|
+| Fresh install | Delete `~/.pi/agent/models.json`, run `/setup` | Wizard starts, creates config |
+| Add provider | Menu > Add new provider | Provider saved to models.json |
+| Edit provider | Menu > Edit: anthropic | Existing values shown, saves changes |
+| Remove provider | Menu > Edit: anthropic > Remove | Provider deleted from models.json |
+| Add model | Edit provider > Add model | Model added to provider |
+| Remove model | Edit provider > Remove model | Model removed from provider |
+| Set default | Complete wizard, select default model | settings.json updated |
+| Thinking level | Complete wizard, change thinking level | settings.json updated |
+| Auth security | Check `~/.pi/agent/auth.json` permissions | Permissions are `0600` |
+| Duplicate model | Add model with existing ID | Error message, no duplicate created |
+| Missing dir | Delete `~/.pi/agent/`, run setup | Directory structure created |
+| Shell script | Run `./setup.sh` standalone | Config files created correctly |
+| Provider persistence | Exit and restart pi, check provider list | Previously saved providers appear |
+| All API types | Add providers for each API type | Correct `api` field values saved |
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing directions, and contribution guidelines.
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Acknowledgments
+
+- [pi](https://github.com/mariozechner/pi-coding-agent) by Mario Zechner — the coding harness this extends
+- Built with TypeScript and pi's extension API
