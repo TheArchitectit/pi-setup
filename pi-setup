@@ -1,0 +1,425 @@
+#!/usr/bin/env python3
+"""pi-setup: interactive wizard for pi configuration.
+
+Navigation: every menu supports '< Back' to return to the previous screen.
+Every input prompt can be cancelled with Enter (empty) to go back.
+"""
+
+import json, os, sys, tempfile
+
+MODELS_FILE = os.path.expanduser("~/.pi/agent/models.json")
+AUTH_FILE = os.path.expanduser("~/.pi/agent/auth.json")
+SETTINGS_FILE = os.path.expanduser("~/.pi/agent/settings.json")
+
+BACK = "__BACK__"
+
+def ensure(f):
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    if not os.path.exists(f):
+        with open(f, "w") as fh: json.dump({}, fh)
+    return f
+
+def load(f):
+    try:
+        with open(f) as fh: return json.load(fh)
+    except: return {}
+
+def save_atomic(f, data):
+    d = os.path.dirname(f); os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".json")
+    with os.fdopen(fd, "w") as fh: json.dump(data, fh, indent=2)
+    os.rename(tmp, f)
+
+def ask(msg, default=None):
+    if default: prompt = f"{msg} [{default}]: "
+    else: prompt = f"{msg}: "
+    a = input(prompt).strip()
+    if not a: return default or ""
+    return a
+
+def ask_back(msg, default=None):
+    """Ask with back support. Returns BACK on empty input if default is set."""
+    if default: prompt = f"{msg} [{default}]: "
+    else: prompt = f"{msg}: "
+    a = input(prompt).strip()
+    if not a:
+        if default:
+            return default
+        return BACK
+    return a
+
+def askp(msg):
+    a = input(f"{msg}: ").strip()
+    if a:
+        print(f"  (captured: {a[:8]}...{a[-4:]})")
+        c = input("  Confirm (y/n)? ").strip().lower()
+        if not c.startswith("y"):
+            return askp(msg)
+    return a
+
+def yesno(msg, default=False):
+    opts = "y/N" if not default else "Y/n"
+    a = input(f"{msg} [{opts}]: ").strip().lower()
+    if not a: return default
+    return a.startswith("y")
+
+def menu(label, items, allow_back=True):
+    """Show numbered menu. Returns selected item or BACK/None."""
+    print(label)
+    for i, item in enumerate(items, 1):
+        print(f"  {i}) {item}")
+    n = len(items)
+    max_n = n
+    if allow_back:
+        print(f"  {n+1}) < Back>")
+        max_n = n + 1
+    while True:
+        a = input(f"Select (1-{max_n}): ").strip()
+        if not a: return BACK if allow_back else None
+        if a.isdigit():
+            idx = int(a)
+            if 1 <= idx <= n:
+                return items[idx - 1]
+            if allow_back and idx == n + 1:
+                return BACK
+        # Treat as raw input (model ID)
+        return a
+
+def menu_or_add(label, items, allow_back=True):
+    """Show numbered menu with 'add new' option."""
+    print(label)
+    for i, item in enumerate(items, 1):
+        print(f"  {i}) {item}")
+    n = len(items)
+    print(f"  {n+1}) + Add new")
+    max_n = n + 1
+    if allow_back:
+        print(f"  {max_n+1}) < Back>")
+        max_n += 1
+    while True:
+        a = input(f"Select (1-{max_n}): ").strip()
+        if not a: return BACK if allow_back else None
+        if a.isdigit():
+            idx = int(a)
+            if 1 <= idx <= n:
+                return items[idx - 1]
+            if idx == n + 1:
+                return None  # add new
+            if allow_back and idx == max_n:
+                return BACK
+
+def get_providers():
+    return load(MODELS_FILE).get("providers", {})
+
+def get_auth_key(key_name):
+    return load(AUTH_FILE).get(key_name, {}).get("key", "")
+
+# ── Model management ──────────────────────────────────────
+def models_menu(prov_name, models, providers):
+    """Manage models for a provider. Returns updated models list or BACK."""
+    while True:
+        if models:
+            model_ids = [m["id"] for m in models]
+            sel = menu_or_add(f"\n  Models ({prov_name}):", model_ids)
+        else:
+            print(f"\n  Models ({prov_name}): (none)")
+            sel = menu_or_add(f"  Models ({prov_name}):", [], allow_back=True)
+
+        if sel == BACK:
+            return models
+        if sel is None:
+            # Add new model
+            result = add_or_edit_model(None, models)
+            if result == BACK:
+                continue
+            models = result
+        else:
+            # Edit existing model
+            result = model_detail(sel, models, providers)
+            if result == BACK:
+                continue
+            models = result
+
+def add_or_edit_model(model_id, models):
+    """Add a new model or edit existing. Returns updated models list or BACK."""
+    existing = None
+    if model_id:
+        for m in models:
+            if m["id"] == model_id:
+                existing = m
+                break
+
+    if existing:
+        def_name = existing.get("name", model_id)
+        def_ctx = str(existing.get("contextWindow", 2000000))
+        def_max = str(existing.get("maxTokens", 1000000000))
+        def_reasoning = existing.get("reasoning", False)
+        def_input = existing.get("input", ["text"])
+        title = f"  Edit model: {model_id}"
+    else:
+        def_name = ""
+        def_ctx = "2000000"
+        def_max = "1000000000"
+        def_reasoning = False
+        def_input = ["text"]
+        title = "  New model"
+
+    print(f"\n{title}")
+    mid = ask_back("    Model ID", model_id or None)
+    if mid == BACK: return BACK
+    if not mid: return BACK
+
+    name = ask_back("    Display name", def_name or mid)
+    if name == BACK: return BACK
+    name = name or mid
+
+    ctx = ask_back("    Context window", def_ctx)
+    if ctx == BACK: return BACK
+
+    maxt = ask_back("    Max output tokens", def_max)
+    if maxt == BACK: return BACK
+
+    reasoning = yesno("    Reasoning?", def_reasoning)
+
+    inp_str = ask("    Input types (text,image)", ",".join(def_input))
+    inp = [t.strip() for t in inp_str.split(",")]
+
+    entry = {
+        "id": mid, "name": name,
+        "reasoning": reasoning, "input": inp,
+        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+        "contextWindow": int(ctx or 2000000),
+        "maxTokens": int(maxt or 1000000000),
+    }
+
+    if existing:
+        for i, m in enumerate(models):
+            if m["id"] == model_id:
+                models[i] = entry; break
+    else:
+        models.append(entry)
+        print(f"  Added: {mid}")
+
+    return models
+
+def model_detail(model_id, models, providers):
+    """Show model detail menu. Returns updated models list or BACK."""
+    while True:
+        print(f"\n  Model: {model_id}")
+        print(f"  1) Edit")
+        print(f"  2) Remove")
+        print(f"  3) Set as default")
+        print(f"  4) < Back>")
+        a = input("  Select (1-4): ").strip()
+
+        if not a or a == "4":
+            return models
+        if a == "1":
+            result = add_or_edit_model(model_id, models)
+            if result == BACK:
+                continue
+            models = result
+        elif a == "2":
+            if yesno(f"  Remove {model_id}?", False):
+                models = [m for m in models if m["id"] != model_id]
+                print(f"  Removed: {model_id}")
+                return models
+        elif a == "3":
+            settings = load(SETTINGS_FILE)
+            # Find provider name
+            for pn, pv in providers.items():
+                for m in pv.get("models", []):
+                    if m["id"] == model_id:
+                        settings["defaultProvider"] = pn
+                        break
+            settings["defaultModel"] = model_id
+            save_atomic(SETTINGS_FILE, settings)
+            print(f"  Default model set: {model_id}")
+
+# ── Provider management ──────────────────────────────────────
+def provider_config(prov_name, existing):
+    """Configure a provider. Returns provider dict or BACK."""
+    existing_url = existing.get("baseUrl", "")
+    existing_api = existing.get("api", "openai-completions")
+    existing_keyref = existing.get("apiKey", prov_name)
+    existing_models = existing.get("models", [])
+    existing_key = load(AUTH_FILE).get(existing_keyref, {}).get("key", "")
+
+    print(f"\n  Configuring: {prov_name}")
+    base_url = ask_back("  Base URL", existing_url or "https://api.example.com/v1")
+    if base_url == BACK: return BACK
+
+    api_type = ask_back("  API type (openai-completions, anthropic, gemini)", existing_api)
+    if api_type == BACK: return BACK
+
+    key_ref = ask_back("  Auth key name", existing_keyref)
+    if key_ref == BACK: return BACK
+
+    if existing_key:
+        print(f"  Current key: ***{existing_key[-4:]}")
+        if yesno("  Update?", False):
+            api_key = askp("  Enter API key")
+        else:
+            api_key = existing_key
+    else:
+        api_key = askp("  Enter API key (enter to skip)")
+
+    # ── Models ──
+    models = existing_models[:]
+    while True:
+        result = models_menu(prov_name, models, get_providers())
+        if result == BACK:
+            break
+        models = result
+        break
+
+    return {
+        "baseUrl": base_url, "api": api_type, "apiKey": key_ref,
+        "models": models,
+    }, api_key
+
+# ── Main wizard ──────────────────────────────────────
+def main():
+    print("╔══════════════════════════════════════╗")
+    print("║       Pi Setup Wizard                ║")
+    print("╚══════════════════════════════════════╝")
+    print()
+    ensure(MODELS_FILE); ensure(AUTH_FILE)
+    os.chmod(AUTH_FILE, 0o600)
+
+    while True:
+        pnames = sorted(get_providers().keys())
+        # Build main menu with providers + add new + quit
+        items = pnames + ["+ Add new provider", "--- Quit ---"]
+        sel = menu("Providers:", items, allow_back=False)
+        if sel == BACK or sel == "--- Quit ---":
+            break
+
+        if sel == "+ Add new provider":
+            prov_name = input("  Provider name: ").strip()
+            if not prov_name: continue
+            result = provider_config(prov_name, {})
+            if result == BACK: continue
+            prov_data, api_key = result
+            provs = get_providers()
+            provs[prov_name] = prov_data
+            save_atomic(MODELS_FILE, {"providers": provs})
+            if api_key:
+                auth = load(AUTH_FILE)
+                auth[prov_data["apiKey"]] = {"type": "api_key", "key": api_key}
+                save_atomic(AUTH_FILE, auth)
+                os.chmod(AUTH_FILE, 0o600)
+            print(f"\n  {prov_name} saved ({len(prov_data['models'])} models)")
+        else:
+            # Edit existing provider
+            provs = get_providers()
+            existing = provs.get(sel, {})
+            while True:
+                print(f"\n  Edit: {sel}")
+                print(f"  1) Configure provider")
+                print(f"  2) Manage models")
+                print(f"  3) Remove provider")
+                print(f"  4) < Back>")
+                a = input("  Select (1-4): ").strip()
+
+                if not a or a == "4":
+                    break
+                if a == "1":
+                    result = provider_config(sel, existing)
+                    if result == BACK: continue
+                    prov_data, api_key = result
+                    provs[sel] = prov_data
+                    save_atomic(MODELS_FILE, {"providers": provs})
+                    if api_key:
+                        auth = load(AUTH_FILE)
+                        auth[prov_data["apiKey"]] = {"type": "api_key", "key": api_key}
+                        save_atomic(AUTH_FILE, auth)
+                        os.chmod(AUTH_FILE, 0o600)
+                    existing = prov_data
+                    print(f"\n  {sel} saved")
+                elif a == "2":
+                    models = existing.get("models", [])
+                    while True:
+                        result = models_menu(sel, models, provs)
+                        if result == BACK:
+                            break
+                        models = result
+                        break
+                    existing["models"] = models
+                    provs[sel] = existing
+                    save_atomic(MODELS_FILE, {"providers": provs})
+                elif a == "3":
+                    if yesno(f"  Remove {sel}?", False):
+                        del provs[sel]
+                        save_atomic(MODELS_FILE, {"providers": provs})
+                        # Clean auth
+                        auth = load(AUTH_FILE)
+                        auth = {k: v for k, v in auth.items()
+                                if any(pv.get("apiKey", pn) == k
+                                       for pn, pv in provs.items())}
+                        save_atomic(AUTH_FILE, auth)
+                        os.chmod(AUTH_FILE, 0o600)
+                        print(f"  Removed: {sel}")
+                        break
+
+    # ── Cleanup: remove providers without valid auth keys ──
+    auth = load(AUTH_FILE)
+    provs = get_providers()
+    cleaned = {}
+    for pn, pv in provs.items():
+        ref = pv.get("apiKey", pn)
+        cred = auth.get(ref)
+        if cred and cred.get("type") == "api_key" and cred.get("key", ""):
+            cleaned[pn] = pv
+        else:
+            print(f"  Removed provider '{pn}' (no valid auth key)")
+    if cleaned:
+        d = load(MODELS_FILE)
+        d["providers"] = cleaned
+        d["defaultProvider"] = list(cleaned.keys())[-1]
+        save_atomic(MODELS_FILE, d)
+    auth = {k: v for k, v in auth.items()
+            if any(pv.get("apiKey", pn) == k for pn, pv in cleaned.items())}
+    save_atomic(AUTH_FILE, auth)
+    os.chmod(AUTH_FILE, 0o600)
+
+    # ── Default model selection ──
+    all_models = []
+    for pn, pv in cleaned.items():
+        for m in pv.get("models", []):
+            all_models.append((pn, m["id"]))
+
+    if all_models:
+        print("\n── Default Model ──")
+        settings = load(SETTINGS_FILE)
+        current_default = settings.get("defaultModel", "")
+        for i, (pn, mid) in enumerate(all_models, 1):
+            marker = " *" if mid == current_default else ""
+            print(f"  {i}) {mid} ({pn}){marker}")
+        print(f"  {len(all_models)+1}) Skip")
+        a = input(f"  Select (1-{len(all_models)+1}): ").strip()
+        if a and a.isdigit() and 1 <= int(a) <= len(all_models):
+            pn, mid = all_models[int(a) - 1]
+            settings["defaultProvider"] = pn
+            settings["defaultModel"] = mid
+            save_atomic(SETTINGS_FILE, settings)
+            print(f"  Default model: {mid} ({pn})")
+
+    # ── Settings ──
+    print("\n── Settings ──")
+    settings = load(SETTINGS_FILE)
+    existing_thinking = settings.get("defaultThinkingLevel", "high")
+    thinking = ask_back("Default thinking level (off/minimal/low/medium/high/xhigh)", existing_thinking)
+    if thinking != BACK:
+        settings["defaultThinkingLevel"] = thinking
+    settings.setdefault("packages", [])
+    save_atomic(SETTINGS_FILE, settings)
+
+    print(f"\n=== Pi setup complete ===")
+    print(f"  {MODELS_FILE}")
+    print(f"  {AUTH_FILE}")
+    print(f"  {SETTINGS_FILE}")
+    print("Run 'pi --list-models' to verify.")
+
+if __name__ == "__main__":
+    main()
