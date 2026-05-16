@@ -194,6 +194,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Install the setup extension
+# ---------------------------------------------------------------------------
+
+step "Installing pi-setup extension"
+
+PI_AGENT_DIR="$HOME/.pi/agent"
+PI_EXT_DIR="$PI_AGENT_DIR/extensions"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+mkdir -p "$PI_EXT_DIR"
+
+if [ -f "$SCRIPT_DIR/extensions/setup.ts" ]; then
+    cp "$SCRIPT_DIR/extensions/setup.ts" "$PI_EXT_DIR/setup.ts"
+    ok "Extension installed to $PI_EXT_DIR/setup.ts"
+elif [ -f "$SCRIPT_DIR/setup.ts" ]; then
+    cp "$SCRIPT_DIR/setup.ts" "$PI_EXT_DIR/setup.ts"
+    ok "Extension installed to $PI_EXT_DIR/setup.ts"
+else
+    warn "Could not find extensions/setup.ts — install manually:"
+    info "  cp extensions/setup.ts ~/.pi/agent/extensions/"
+fi
+
+# ---------------------------------------------------------------------------
 # Development setup
 # ---------------------------------------------------------------------------
 
@@ -297,6 +320,30 @@ info "  cd <your-project>"
 info "  pi"
 info "  pi --help"
 
+# Check if this is a first-time install (no providers configured)
+if [ ! -f "$PI_AGENT_DIR/models.json" ] || ! grep -q '"providers"' "$PI_AGENT_DIR/models.json" 2>/dev/null; then
+    printf '\n%sFirst time?%s The setup wizard will launch automatically when you start pi.\n' "${COLOR_BOLD}" "${COLOR_RESET}"
+    info "  You can also run /setup inside pi at any time."
+    info "  Or run: ./setup.sh   for the standalone shell wizard"
+fi
+
+# Check for API keys
+printf '\n%sAPI Keys:%s\n' "${COLOR_BOLD}" "${COLOR_RESET}"
+found_keys=false
+for var in ANTHROPIC_API_KEY OPENAI_API_KEY GOOGLE_GENERATIVE_AI_API_KEY XAI_API_KEY; do
+    if [ -n "${!var:-}" ]; then
+        ok "$var is set"
+        found_keys=true
+    fi
+done
+if [ "$found_keys" = false ]; then
+    warn "No API keys detected in your environment."
+    info "Add them to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+    info '  export ANTHROPIC_API_KEY="sk-ant-..."'
+    info '  export OPENAI_API_KEY="sk-..."'
+    info "Then reload: source ~/.bashrc"
+fi
+
 if [ "$SETUP_DEV" = true ]; then
     printf '\n%sDevelopment commands:%s\n' "${COLOR_BOLD}" "${COLOR_RESET}"
     info "  pi --create-skill <name>    Create a new skill"
@@ -305,3 +352,4 @@ if [ "$SETUP_DEV" = true ]; then
 fi
 
 printf '\n%sDocumentation:%s https://pi.dev/docs/latest\n' "${COLOR_DIM}" "${COLOR_RESET}"
+printf '%sSetup docs:%s https://github.com/TheArchitectit/pi-setup#readme\n\n' "${COLOR_DIM}" "${COLOR_RESET}"

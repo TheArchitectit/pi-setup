@@ -4,7 +4,7 @@ Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the m
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
 
-> **Status:** Alpha (v0.0.1-alpha.1) — API may change between releases.
+> **Status:** Alpha (v0.0.2-alpha.2) — API may change between releases.
 
 ---
 
@@ -32,12 +32,15 @@ Configure providers, models, thinking levels, and defaults through an interactiv
 ## Features
 
 - **Interactive `/setup` command** — runs inside pi using built-in UI dialogs (select, input, confirm)
-- **Standalone shell wizard** — bootstrap config before pi is even installed
+- **Standalone shell wizard** (`pi-setup`) — bootstrap config before pi is even installed
+- **Back navigation** — every menu supports `< Back` to return to the previous screen
 - **Auto-registration** — saved providers are loaded on pi startup automatically
 - **Multi-provider support** — Anthropic, OpenAI, Google, XAI, OpenCode, Ollama, LM Studio, and custom endpoints
 - **Model management** — add, edit, and remove models per provider
+- **Inline "set as default"** — offered immediately after adding a model
 - **Default model selection** — set your preferred model and thinking level
 - **Secure auth storage** — API key references saved with `0600` permissions
+- **Provider cleanup** — providers without valid auth keys are removed on exit
 
 ---
 
@@ -119,8 +122,10 @@ The shell wizard:
 1. Checks for pi and its config directory
 2. Prompts you to configure providers
 3. Asks for API keys (stored as environment variable references)
-4. Lists and selects available models
+4. Lists and selects available models with full back navigation
 5. Writes the config files that pi reads on startup
+
+Every menu supports `< Back` to return to the previous screen. Text inputs can be cancelled with Enter (empty) to go back.
 
 ---
 
@@ -274,9 +279,13 @@ The `setup.sh` script is independent of pi. It:
 
 ---
 
+## Release Notes
+
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version history.
+
 ## Testing
 
-Since this is an alpha release, we need your help testing. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing instructions.
+Since this is an alpha release, we need your help testing. See [TESTER_NOTES.md](TESTER_NOTES.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing instructions.
 
 ### Quick Test
 
