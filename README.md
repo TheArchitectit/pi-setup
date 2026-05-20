@@ -4,7 +4,7 @@ Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the m
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
 
-> **Status:** Alpha (v0.0.3-alpha.3) — API may change between releases.
+> **Status:** Alpha (v0.0.5-alpha.5) — API may change between releases.
 
 ---
 
@@ -327,6 +327,9 @@ pi
 | Fresh install | Delete `~/.pi/agent/models.json`, run `/setup` | Wizard starts, creates config |
 | Add provider | Menu > Add new provider | Provider saved to models.json |
 | Edit provider | Menu > Edit: anthropic | Existing values shown, saves changes |
+| Edit base URL | Edit provider > Base URL | Input pre-filled with current URL, saves changes |
+| Edit API type | Edit provider > API type | Select from API types, saves changes |
+| Edit API key | Edit provider > API key | Input pre-filled with current key, saves changes |
 | Remove provider | Menu > Edit: anthropic > Remove | Provider deleted from models.json |
 | Add model | Edit provider > Add model | Model added to provider |
 | Remove model | Edit provider > Remove model | Model removed from provider |

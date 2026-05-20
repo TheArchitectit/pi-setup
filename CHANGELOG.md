@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.5-alpha.5] - 2026-05-20
+
+### Added
+
+- **Edit provider settings** — the "Edit provider" menu now exposes Base URL, API type, and API key options, so you can change endpoint, protocol, or key without deleting and re-adding the provider
+
+---
+
 ## [0.0.4-alpha.4] - 2026-05-20
 
 ### Fixed

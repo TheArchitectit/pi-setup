@@ -229,7 +229,11 @@ async function editProvider(
 ): Promise<"back" | void> {
   let backToProvider = true;
   while (backToProvider) {
+    const pv = providers[name];
     const action = await ui.select(`Edit "${name}":`, [
+      "Base URL",
+      "API type",
+      "API key",
       "Manage models",
       "Remove provider",
       "< Back",
@@ -237,8 +241,34 @@ async function editProvider(
 
     if (!action || action === "< Back") return "back";
 
-    if (action === "Manage models") {
-      await modelsLoop(ui, providers[name], providers);
+    if (action === "Base URL") {
+      const url = await ui.input("Base URL:", pv.baseUrl);
+      if (url) {
+        pv.baseUrl = url;
+        saveModels(providers);
+        ui.notify(`Base URL updated`, "info");
+      }
+    } else if (action === "API type") {
+      const api = await ui.select("API type:", [
+        "openai-completions",
+        "anthropic-messages",
+        "gemini",
+      ]);
+      if (api) {
+        pv.api = api;
+        saveModels(providers);
+        ui.notify(`API type updated: ${api}`, "info");
+      }
+    } else if (action === "API key") {
+      const key = await ui.input("API key env var (or raw key):", pv.apiKey ?? "");
+      if (key !== undefined) {
+        pv.apiKey = key;
+        saveModels(providers);
+        saveAuth(key);
+        ui.notify(`API key updated`, "info");
+      }
+    } else if (action === "Manage models") {
+      await modelsLoop(ui, pv, providers);
       saveModels(providers);
       ui.notify(`Models updated for "${name}"`, "info");
     } else if (action === "Remove provider") {

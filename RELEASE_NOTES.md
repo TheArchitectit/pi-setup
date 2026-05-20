@@ -1,5 +1,19 @@
 # Release Notes
 
+## v0.0.5-alpha.5
+
+### Edit Provider Settings
+
+The "Edit provider" menu now includes three new options:
+
+- **Base URL** — change the endpoint URL for an existing provider
+- **API type** — switch between `openai-completions`, `anthropic-messages`, or `gemini`
+- **API key** — update the API key env var or raw key
+
+All options are pre-filled with the current value, so you can see what's set before making changes.
+
+---
+
 ## v0.0.4-alpha.4
 
 ### Extension Namespace Fix + Install Safety
