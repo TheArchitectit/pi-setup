@@ -4,7 +4,7 @@ Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the m
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
 
-> **Status:** Alpha (v0.0.5-alpha.5) — API may change between releases.
+> **Status:** Alpha (v0.0.6-alpha.6) — API may change between releases.
 
 ---
 

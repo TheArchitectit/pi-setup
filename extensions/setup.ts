@@ -215,7 +215,7 @@ async function addProvider(
 
   providers[name] = provider;
   saveModels(providers);
-  if (keyEnv) saveAuth(keyEnv);
+  if (keyEnv) saveAuth(name, keyEnv);
   ui.notify(`Provider "${name}" saved`, "info");
 }
 
@@ -264,7 +264,7 @@ async function editProvider(
       if (key !== undefined) {
         pv.apiKey = key;
         saveModels(providers);
-        saveAuth(key);
+        saveAuth(name, key);
         ui.notify(`API key updated`, "info");
       }
     } else if (action === "Manage models") {
@@ -417,8 +417,8 @@ function saveModels(providers: Record<string, ProviderEntry>) {
   saveJson(MODELS_FILE, { providers });
 }
 
-function saveAuth(keyRef: string) {
+function saveAuth(providerName: string, key: string) {
   const auth = loadJson(AUTH_FILE);
-  auth[keyRef] = { type: "api_key", key: keyRef };
+  auth[providerName] = { type: "api_key", key };
   saveJson(AUTH_FILE, auth);
 }

@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.6-alpha.6] - 2026-05-20
+
+### Fixed
+
+- **`saveAuth` stored keys under raw key string instead of provider name** — `auth.json` entries are now keyed by provider name (e.g. `auth["plexus"]`), so pi can look them up correctly when authenticating API requests
+
+---
+
 ## [0.0.5-alpha.5] - 2026-05-20
 
 ### Added

@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.0.6-alpha.6
+
+### Fix: API key lookup
+
+`saveAuth` was storing the API key under the raw key string as the JSON key instead of the provider name. This meant pi looked up `auth["plexus"]` but only found `auth["aIKm14MEjJ8Iy7W7Og..."]`, resulting in 401 errors even after setting the key.
+
+Fix: keys are now stored under the provider name in `auth.json`.
+
+---
+
 ## v0.0.5-alpha.5
 
 ### Edit Provider Settings
