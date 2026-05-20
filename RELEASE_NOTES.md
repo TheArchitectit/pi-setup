@@ -1,5 +1,29 @@
 # Release Notes
 
+## v0.0.4-alpha.4
+
+### Extension Namespace Fix + Install Safety
+
+**1. `Cannot find module '@earendil-works/pi-tui'` on startup**
+
+The extension imported from the deprecated `@mariozechner/pi-coding-agent` package. When pi migrated to the `@earendil-works` namespace, existing extensions that depend on `@earendil-works/pi-tui` broke because the deprecated package doesn't provide it.
+
+Fix: Extension now imports from `@earendil-works/pi-coding-agent`.
+
+**2. `install.sh` broke existing pi installations**
+
+The install script ran `npm install -g @mariozechner/pi-coding-agent` (deprecated), which overwrote the working `@earendil-works/pi-coding-agent` binary. This broke every extension that depended on the new package.
+
+Fix: `install.sh` no longer installs pi. It only installs the setup extension. If pi is not found, it tells you how to install it manually.
+
+**Migration:** If you're hitting the `Cannot find module` error, re-pull the extension and restart pi:
+```bash
+git pull
+cp extensions/setup.ts ~/.pi/agent/extensions/setup.ts
+```
+
+---
+
 ## v0.0.3-alpha.3
 
 ### Back Navigation Fix + `developer` Role Fix

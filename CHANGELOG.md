@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.4-alpha.4] - 2026-05-20
+
+### Fixed
+
+- **Extension import namespace** — switched from deprecated `@mariozechner/pi-coding-agent` to `@earendil-works/pi-coding-agent`, fixing `Cannot find module '@earendil-works/pi-tui'` errors on startup
+- **Install script no longer reinstalls pi** — `install.sh` only installs the setup extension now; it checks that pi is present but never runs `npm install -g`, preventing the deprecated package from clobbering the working installation
+
+---
+
 ## [0.0.3-alpha.3] - 2026-05-20
 
 ### Fixed

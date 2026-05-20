@@ -39,7 +39,7 @@ else
 fi
 
 CURRENT_STEP=0
-TOTAL_STEPS=4
+TOTAL_STEPS=3
 
 step() {
     CURRENT_STEP=$((CURRENT_STEP + 1))
@@ -153,45 +153,16 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 ok "npm: $(npm --version)"
 
-step "Installing pi"
+step "Checking pi installation"
 
-# Check if we can install globally
-CAN_INSTALL_GLOBAL=false
-if npm config get prefix >/dev/null 2>&1; then
-    NPM_PREFIX=$(npm config get prefix)
-    if [ -w "$NPM_PREFIX" ] || [ -w "$NPM_PREFIX/bin" ] 2>/dev/null; then
-        CAN_INSTALL_GLOBAL=true
-    fi
+if ! command -v pi >/dev/null 2>&1; then
+    error "pi is not installed. Please install it first:"
+    info '  npm install -g @earendil-works/pi-coding-agent'
+    exit 1
 fi
 
-if [ "$CAN_INSTALL_GLOBAL" = true ]; then
-    info "Installing pi globally via npm..."
-    npm install -g @mariozechner/pi-coding-agent
-else
-    info "Installing pi locally (no global npm permissions)..."
-    LOCAL_DIR="${HOME}/.local/share/pi"
-    mkdir -p "$LOCAL_DIR"
-    npm install --prefix "$LOCAL_DIR" @mariozechner/pi-coding-agent
-
-    # Create symlink
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$LOCAL_DIR/node_modules/.bin/pi" "$HOME/.local/bin/pi"
-
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        warn "Add $HOME/.local/bin to your PATH:"
-        warn '  export PATH="$HOME/.local/bin:$PATH"'
-    fi
-fi
-
-step "Verifying installation"
-if command -v pi >/dev/null 2>&1; then
-    PI_VERSION=$(pi --version 2>/dev/null || echo "installed")
-    ok "pi is ready: $PI_VERSION"
-else
-    warn "pi command not found in PATH"
-    info "You may need to restart your shell or add to PATH:"
-    info '  export PATH="$HOME/.local/bin:$PATH"'
-fi
+PI_VERSION=$(pi --version 2>/dev/null || echo "installed")
+ok "pi found: $PI_VERSION"
 
 # ---------------------------------------------------------------------------
 # Install the setup extension
