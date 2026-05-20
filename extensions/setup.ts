@@ -39,6 +39,7 @@ type ProviderEntry = {
     maxTokens: number;
     reasoning: boolean;
     input: string[];
+    compat?: { supportsDeveloperRole?: boolean };
   }>;
 };
 
@@ -68,6 +69,7 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: m.contextWindow,
         maxTokens: m.maxTokens,
+        compat: { supportsDeveloperRole: false },
       })),
     });
   }
@@ -95,46 +97,53 @@ export default function (pi: ExtensionAPI) {
       const modelsData = loadJson(MODELS_FILE);
       const providers = (modelsData.providers ?? {}) as Record<string, ProviderEntry>;
 
-      // ── Main loop — allows "Back" from provider menu to restart ──
-      let exitWizard = false;
-      while (!exitWizard) {
-        const providerNames = Object.keys(providers);
-        const choices = [
-          "+ Add new provider",
-          ...providerNames.map((n) => `Edit: ${n}`),
-          "--- Done ---",
-        ];
+      // ── Main wizard flow ──
+      let step: "providers" | "model" | "thinking" | "" = "providers";
 
-        const pick = await ui.select("Providers:", choices);
-        if (!pick || pick === "--- Done ---") break;
+      while (step) {
+        if (step === "providers") {
+          const providerNames = Object.keys(providers);
+          const choices = [
+            "+ Add new provider",
+            ...providerNames.map((n) => `Edit: ${n}`),
+            "--- Done ---",
+          ];
 
-        if (pick === "+ Add new provider") {
-          const back = await addProvider(ui, providers);
-          if (back === "back") continue;
-        } else {
-          const name = pick.replace(/^Edit: /, "");
-          const back = await editProvider(ui, name, providers);
-          if (back === "back") continue;
+          const pick = await ui.select("Providers:", choices);
+          if (!pick) { step = ""; break; }
+          if (pick === "--- Done ---") { step = "model"; continue; }
+
+          if (pick === "+ Add new provider") {
+            const back = await addProvider(ui, providers);
+            if (back === "back") continue;
+          } else {
+            const name = pick.replace(/^Edit: /, "");
+            const back = await editProvider(ui, name, providers);
+            if (back === "back") continue;
+          }
+          // Stay on providers after add/edit
+          continue;
         }
-      }
 
-      // ── Default model selection ──
-      const allModels = getAllModels(providers);
-      if (allModels.length > 0) {
-        const settings = loadJson(SETTINGS_FILE);
-        const currentDefault = (settings.defaultModel as string) ?? "";
+        if (step === "model") {
+          const allModels = getAllModels(providers);
+          if (allModels.length === 0) { step = "thinking"; continue; }
 
-        let pickedModel = false;
-        while (!pickedModel) {
+          const settings = loadJson(SETTINGS_FILE);
+          const currentDefault = (settings.defaultModel as string) ?? "";
+
           const choices = [
             ...allModels.map((m) =>
               `${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}`,
             ),
+            "< Back to providers",
             "--- Done ---",
           ];
 
           const picked = await ui.select("Set default model:", choices);
-          if (!picked || picked === "--- Done ---") break;
+          if (!picked) { step = "providers"; continue; }
+          if (picked === "< Back to providers") { step = "providers"; continue; }
+          if (picked === "--- Done ---") { step = "thinking"; continue; }
 
           const match = allModels.find(
             (m) => `${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}` === picked,
@@ -144,29 +153,36 @@ export default function (pi: ExtensionAPI) {
             settings.defaultModel = match.id;
             saveJson(SETTINGS_FILE, settings);
             ui.notify(`Default model: ${match.id}`, "info");
-            pickedModel = true;
           }
+          step = "thinking";
+          continue;
         }
-      }
 
-      // ── Thinking level ──
-      const settings = loadJson(SETTINGS_FILE);
-      const currentThinking = (settings.defaultThinkingLevel as string) ?? "high";
-      const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
-      const thinkingPick = await ui.select(
-        "Default thinking level:",
-        levels.map((l) => `${l}${l === currentThinking ? " *" : ""}`),
-      );
-      if (thinkingPick) {
-        const level = thinkingPick.replace(/ \*$/, "") as string;
-        settings.defaultThinkingLevel = level;
-        saveJson(SETTINGS_FILE, settings);
-        ui.notify(`Thinking level: ${level}`, "info");
+        if (step === "thinking") {
+          const settings = loadJson(SETTINGS_FILE);
+          const currentThinking = (settings.defaultThinkingLevel as string) ?? "high";
+          const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
+          const choices = [
+            ...levels.map((l) => `${l}${l === currentThinking ? " *" : ""}`),
+            "< Back to model",
+            "--- Done ---",
+          ];
+          const thinkingPick = await ui.select("Default thinking level:", choices);
+          if (!thinkingPick) { step = "model"; continue; }
+          if (thinkingPick === "--- Done ---") { step = ""; break; }
+          if (thinkingPick === "< Back to model") { step = "model"; continue; }
+
+          const level = thinkingPick.replace(/ \*$/, "") as string;
+          settings.defaultThinkingLevel = level;
+          saveJson(SETTINGS_FILE, settings);
+          ui.notify(`Thinking level: ${level}`, "info");
+          step = ""; break;
+        }
       }
 
       // ── Apply providers to current session ──
       applyProviders(pi, providers);
-      ui.notify("Setup complete", "info");
+      if (step === "") ui.notify("Setup complete", "info");
     },
   });
 }
@@ -195,12 +211,7 @@ async function addProvider(
 
   const provider: ProviderEntry = { baseUrl, api: apiPick, apiKey: keyEnv, models: [] };
 
-  let backFromModels = true;
-  while (backFromModels) {
-    const result = await modelsLoop(ui, provider, providers);
-    if (result === "back") continue;
-    backFromModels = false;
-  }
+  await modelsLoop(ui, provider, providers);
 
   providers[name] = provider;
   saveModels(providers);
@@ -227,12 +238,7 @@ async function editProvider(
     if (!action || action === "< Back") return "back";
 
     if (action === "Manage models") {
-      let backFromModels = true;
-      while (backFromModels) {
-        const result = await modelsLoop(ui, providers[name], providers);
-        if (result === "back") continue;
-        backFromModels = false;
-      }
+      await modelsLoop(ui, providers[name], providers);
       saveModels(providers);
       ui.notify(`Models updated for "${name}"`, "info");
     } else if (action === "Remove provider") {

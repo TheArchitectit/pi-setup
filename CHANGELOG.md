@@ -7,6 +7,34 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.3-alpha.3] - 2026-05-20
+
+### Fixed
+
+- **Back navigation after model/provider selection** — wizard now uses a state machine (`providers` → `model` → `thinking`) so `< Back` actually returns to the previous step instead of trapping the user
+- **`developer` role 400 error** — custom provider endpoints that don't support OpenAI's `developer` role now get `compat.supportsDeveloperRole: false`, preventing `messages[0].role: unknown variant "developer"` errors
+- **Models loop trapping** — removed `while(backFromModels)` loops in `addProvider` and `editProvider` that re-entered modelsLoop on "back", making it impossible to leave the models screen
+- **Escape/Back behavior** — Escape (`null`) on model selection now returns to providers instead of skipping forward to thinking; Escape on thinking returns to model instead of exiting
+
+### Added
+
+- `< Back to providers` option in default model selection
+- `< Back to model` option in thinking level selection
+- `compat` field support in `ProviderEntry` type and model schema
+- `compat.supportsDeveloperRole: false` set automatically on all registered models via `applyProviders()`
+
+---
+
+## [0.0.2-alpha.2] - 2025-05-17
+
+### Changed
+
+- Shell wizard: full back navigation on every menu
+- Extension: back navigation pattern + first-run auto-hint
+- "Set as default" offered inline after adding a model
+
+---
+
 ## [0.0.1-alpha.1] - 2025-05-16
 
 ### Added

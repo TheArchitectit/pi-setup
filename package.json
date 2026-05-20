@@ -1,6 +1,6 @@
 {
   "name": "pi-setup",
-  "version": "0.0.1-alpha.1",
+  "version": "0.0.3-alpha.3",
   "description": "Setup wizard for pi — configure providers, models, and defaults via /setup command",
   "type": "module",
   "license": "MIT",

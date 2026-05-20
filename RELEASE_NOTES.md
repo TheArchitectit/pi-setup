@@ -1,5 +1,33 @@
 # Release Notes
 
+## v0.0.3-alpha.3
+
+### Back Navigation Fix + `developer` Role Fix
+
+Two critical bugs fixed in the extension (`/setup` command):
+
+**1. Back navigation actually works now**
+
+The wizard was using a flat loop that jumped forward on every selection, trapping users in model/thinking screens with no way back. Now uses a proper state machine:
+
+```
+providers ──Done──> model ──Done──> thinking ──Done──> exit
+    ^                |  ^              |
+    └──< Back────────┘  └──< Back──────┘
+```
+
+Every screen has explicit `< Back` and `--- Done ---` options. Escape navigates back (not forward or out).
+
+**2. `developer` role rejected by custom providers**
+
+Pi-ai sends `role: "developer"` instead of `"system"` for reasoning models when `compat.supportsDeveloperRole` is true. Custom endpoints (ozore, canopywave, neuralwatt, etc.) reject this with a 400 error.
+
+Fix: `applyProviders()` now sets `compat.supportsDeveloperRole: false` on every model. The setup wizard also persists the `compat` field in `models.json` so models survive round-trips.
+
+**Migration:** If you have existing models with `reasoning: true` and are hitting the 400 error, re-run `/setup` or add `"compat": { "supportsDeveloperRole": false }` to the model entry in `~/.pi/agent/models.json`.
+
+---
+
 ## v0.0.2-alpha.2
 
 ### Shell Wizard: Back Navigation

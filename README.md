@@ -4,7 +4,7 @@ Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the m
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
 
-> **Status:** Alpha (v0.0.2-alpha.2) — API may change between releases.
+> **Status:** Alpha (v0.0.3-alpha.3) — API may change between releases.
 
 ---
 
@@ -162,6 +162,9 @@ Each provider in `models.json` follows this structure:
           },
           "contextWindow": 200000,
           "maxTokens": 16384,
+          "compat": {
+            "supportsDeveloperRole": false
+          },
           "thinkingLevelMap": {
             "off": 0,
             "minimal": 1,
@@ -193,6 +196,8 @@ Each provider in `models.json` follows this structure:
 | `contextWindow` | `number` | Maximum context window in tokens |
 | `maxTokens` | `number` | Maximum output tokens |
 | `thinkingLevelMap` | `object` | Mapping of thinking level names to API values |
+| `compat` | `object` | Provider compatibility flags |
+| `compat.supportsDeveloperRole` | `boolean` | Set `false` for endpoints that reject `role: "developer"` (default: `false` via setup extension) |
 
 ### Settings Schema
 
