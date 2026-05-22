@@ -32,6 +32,7 @@ type ProviderEntry = {
   baseUrl: string;
   api: string;
   apiKey?: string;
+  compat?: { supportsDeveloperRole?: boolean };
   models: Array<{
     id: string;
     name: string;
@@ -57,6 +58,9 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
   for (const [name, pv] of Object.entries(providers)) {
     if (!pv.baseUrl || pv.models.length === 0) continue;
 
+    // Provider-level compat from models.json; model-level compat overrides
+    const providerCompat = pv.compat ?? {};
+
     pi.registerProvider(name, {
       baseUrl: pv.baseUrl,
       apiKey: pv.apiKey,
@@ -69,7 +73,7 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: m.contextWindow,
         maxTokens: m.maxTokens,
-        compat: { supportsDeveloperRole: false },
+        compat: { ...providerCompat, ...m.compat },
       })),
     });
   }
@@ -209,7 +213,13 @@ async function addProvider(
 
   const keyEnv = await ui.input("API key env var (or raw key):", name.toUpperCase() + "_API_KEY");
 
-  const provider: ProviderEntry = { baseUrl, api: apiPick, apiKey: keyEnv, models: [] };
+  const provider: ProviderEntry = {
+    baseUrl,
+    api: apiPick,
+    apiKey: keyEnv,
+    models: [],
+    compat: { supportsDeveloperRole: false },
+  };
 
   await modelsLoop(ui, provider, providers);
 
