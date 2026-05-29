@@ -63,7 +63,7 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
 
     pi.registerProvider(name, {
       baseUrl: pv.baseUrl,
-      apiKey: pv.apiKey,
+      apiKey: name,
       api: pv.api as any,
       models: pv.models.map((m) => ({
         id: m.id,
@@ -211,12 +211,12 @@ async function addProvider(
   ]);
   if (!apiPick) return "back";
 
-  const keyEnv = await ui.input("API key env var (or raw key):", name.toUpperCase() + "_API_KEY");
+  const keyInput = await ui.input("API key:", "");
 
   const provider: ProviderEntry = {
     baseUrl,
     api: apiPick,
-    apiKey: keyEnv,
+    apiKey: name,
     models: [],
     compat: { supportsDeveloperRole: false },
   };
@@ -225,7 +225,7 @@ async function addProvider(
 
   providers[name] = provider;
   saveModels(providers);
-  if (keyEnv) saveAuth(name, keyEnv);
+  if (keyInput) saveAuth(name, keyInput);
   ui.notify(`Provider "${name}" saved`, "info");
 }
 
@@ -270,9 +270,9 @@ async function editProvider(
         ui.notify(`API type updated: ${api}`, "info");
       }
     } else if (action === "API key") {
-      const key = await ui.input("API key env var (or raw key):", pv.apiKey ?? "");
-      if (key !== undefined) {
-        pv.apiKey = key;
+      const key = await ui.input("API key:", "");
+      if (key !== undefined && key !== "") {
+        pv.apiKey = name;
         saveModels(providers);
         saveAuth(name, key);
         ui.notify(`API key updated`, "info");
