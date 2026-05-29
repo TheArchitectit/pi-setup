@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.7] - 2026-05-28
+
+### Fixed
+
+- **`$` characters in API keys caused 401 auth errors** — Pi v0.76+ treats `$` as an env-var interpolation prefix in `resolveConfigValue`. Raw keys containing `$` (e.g. `7Gm&...$Oon951...`) were parsed as `$Oon951` env var references, producing "Failed to resolve API key from environment variable: Oon951". `saveAuth` now escapes `$` as `$$` so Pi resolves them as literal `$`
+- **`registerProvider` received raw key instead of resolved key from auth.json** — `applyProviders` now reads auth.json at startup and passes the resolved key to `registerProvider`, so the apiKey field contains the actual key rather than a provider name or env var reference
+- **`models.json` apiKey field written as raw key instead of provider name** — `addProvider` and `editProvider` now write the provider name to `models.json`'s `apiKey` (the lookup key into auth.json), not the raw API key value
+
+---
+
 ## [0.0.6-alpha.6] - 2026-05-20
 
 ### Fixed

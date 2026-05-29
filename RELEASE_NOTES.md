@@ -1,5 +1,31 @@
 # Release Notes
 
+## v0.0.7
+
+### Fix: Pi v0.76+ API key resolution
+
+Three related bugs caused 401 authentication errors when using API keys with special characters:
+
+**1. `$` in API keys treated as env-var interpolation**
+
+Pi v0.76+ introduced template-based config value resolution. Raw keys containing `$` (e.g. `7Gm&...$Oon951...`) were parsed as `$Oon951` environment variable references, causing `resolveConfigValue` to return `undefined` and Pi to throw "Failed to resolve API key from environment variable: Oon951".
+
+Fix: `saveAuth` now escapes `$` as `$$` in `auth.json`. Pi's resolver converts `$$` back to a literal `$`.
+
+**2. `registerProvider` received provider name instead of resolved key**
+
+`applyProviders` passed the provider name (`"plexus"`) as the `apiKey` field to `registerProvider`. Pi v0.77 resolves this as a literal string, sending `"plexus"` as the Authorization header instead of the actual key.
+
+Fix: `applyProviders` now reads `auth.json` at startup and passes the resolved key to `registerProvider`.
+
+**3. `models.json` apiKey written as raw key**
+
+`addProvider` and `editProvider` wrote the raw API key to `models.json`'s `apiKey` field instead of the provider name (the lookup key into `auth.json`).
+
+Fix: `models.json` now always stores the provider name in `apiKey`. The raw key lives only in `auth.json`.
+
+---
+
 ## v0.0.6-alpha.6
 
 ### Fix: API key lookup
