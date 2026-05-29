@@ -55,15 +55,22 @@ function getAllModels(providers: Record<string, ProviderEntry>) {
 }
 
 function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntry>) {
+  const authData = loadJson(AUTH_FILE);
+
   for (const [name, pv] of Object.entries(providers)) {
     if (!pv.baseUrl || pv.models.length === 0) continue;
 
     // Provider-level compat from models.json; model-level compat overrides
     const providerCompat = pv.compat ?? {};
 
+    // Read the actual API key from auth.json so registerProvider
+    // gets the resolved key, not a provider name or env var reference.
+    const authEntry = authData[name] as { type?: string; key?: string } | undefined;
+    const resolvedKey = authEntry?.type === "api_key" && authEntry.key ? authEntry.key : pv.apiKey ?? name;
+
     pi.registerProvider(name, {
       baseUrl: pv.baseUrl,
-      apiKey: name,
+      apiKey: resolvedKey,
       api: pv.api as any,
       models: pv.models.map((m) => ({
         id: m.id,
