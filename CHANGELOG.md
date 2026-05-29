@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.8] - 2026-05-29
+
+### Fixed
+
+- **`saveAuth` never actually escaped `$` in API keys** — JavaScript's `String.prototype.replace` treats `$$` in a string replacement as a literal `$`, so `key.replace(/\$/g, "$$")` was a no-op. Keys containing `$` (e.g. `$W7Og`) were stored unescaped in auth.json, where Pi's `resolveConfigValue` misinterpreted them as env-var references, producing "Failed to resolve API key from environment variable: W7Og". Fixed by using an arrow function replacement: `key.replace(/\$/g, () => "$$")`
+- **Startup auto-heal for unescaped keys in auth.json** — `ensureAuthKeysEscaped()` runs before provider registration on every startup, re-escaping any `$` characters that were saved before this fix. This handles keys that were saved by the broken `saveAuth` or entered manually
+
+---
+
 ## [0.0.7] - 2026-05-28
 
 ### Fixed

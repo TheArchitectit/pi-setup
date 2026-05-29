@@ -54,6 +54,29 @@ function getAllModels(providers: Record<string, ProviderEntry>) {
   return result;
 }
 
+function ensureAuthKeysEscaped() {
+  const authData = loadJson(AUTH_FILE);
+  let dirty = false;
+
+  for (const [, entry] of Object.entries(authData)) {
+    const cred = entry as { type?: string; key?: string };
+    if (cred?.type !== "api_key" || !cred.key) continue;
+    // Re-escape: undo any existing $$ → $, then escape all $ → $$.
+    // This fixes keys that were saved before the escaping fix, while
+    // leaving already-correct keys unchanged.
+    const unescaped = cred.key.replace(/\$\$/g, "$");
+    // Arrow function is required: String.replace treats $$ in a string
+    // replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
+    const reEscaped = unescaped.replace(/\$/g, () => "$$");
+    if (reEscaped !== cred.key) {
+      cred.key = reEscaped;
+      dirty = true;
+    }
+  }
+
+  if (dirty) saveJson(AUTH_FILE, authData);
+}
+
 function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntry>) {
   const authData = loadJson(AUTH_FILE);
 
@@ -65,6 +88,8 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
 
     // Read the actual API key from auth.json so registerProvider
     // gets the resolved key, not a provider name or env var reference.
+    // Keys in auth.json are already $$-escaped by saveAuth; Pi's
+    // resolveConfigValue resolves $$ back to a literal $.
     const authEntry = authData[name] as { type?: string; key?: string } | undefined;
     const resolvedKey = authEntry?.type === "api_key" && authEntry.key ? authEntry.key : pv.apiKey ?? name;
 
@@ -87,6 +112,11 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
 }
 
 export default function (pi: ExtensionAPI) {
+  // Fix any unescaped $ in auth.json before Pi's AuthStorage resolves them.
+  // Keys containing $VAR are misinterpreted as env-var references; $$
+  // is the escape sequence for a literal $.
+  ensureAuthKeysEscaped();
+
   // Auto-register providers from saved config on startup
   const modelsData = loadJson(MODELS_FILE);
   const providers = (modelsData.providers ?? {}) as Record<string, ProviderEntry>;
@@ -440,7 +470,9 @@ function saveAuth(providerName: string, key: string) {
   // interpolate $VAR references in raw API keys.  Pi v0.76+
   // treats $ as an env-var interpolation prefix; $$ is the
   // escape sequence for a literal $.
-  const escapedKey = key.replace(/\$/g, "$$");
+  // Arrow function is required: String.replace treats $$ in a string
+  // replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
+  const escapedKey = key.replace(/\$/g, () => "$$");
   auth[providerName] = { type: "api_key", key: escapedKey };
   saveJson(AUTH_FILE, auth);
 }
