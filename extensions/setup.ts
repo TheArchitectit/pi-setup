@@ -436,6 +436,11 @@ function saveModels(providers: Record<string, ProviderEntry>) {
 
 function saveAuth(providerName: string, key: string) {
   const auth = loadJson(AUTH_FILE);
-  auth[providerName] = { type: "api_key", key };
+  // Escape $ as $$ so Pi's resolveConfigValue doesn't try to
+  // interpolate $VAR references in raw API keys.  Pi v0.76+
+  // treats $ as an env-var interpolation prefix; $$ is the
+  // escape sequence for a literal $.
+  const escapedKey = key.replace(/\$/g, "$$");
+  auth[providerName] = { type: "api_key", key: escapedKey };
   saveJson(AUTH_FILE, auth);
 }
