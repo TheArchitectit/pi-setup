@@ -360,3 +360,10 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 - [pi](https://github.com/mariozechner/pi-coding-agent) by Mario Zechner — the coding harness this extends
 - Built with TypeScript and pi's extension API
+
+
+## ☁️ Cloud Credits
+
+Power your AI projects with [Ozore.com](https://ozore.com) — use code **lundrog50** for 50% off your first month.
+
+> `direct-pin` and `custom-router` are available on **Pro** and **Max** plans only.
