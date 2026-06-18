@@ -83,8 +83,14 @@ function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntr
   for (const [name, pv] of Object.entries(providers)) {
     if (!pv.baseUrl || pv.models.length === 0) continue;
 
-    // Provider-level compat from models.json; model-level compat overrides
-    const providerCompat = pv.compat ?? {};
+    // Provider-level compat from models.json; model-level compat overrides.
+    // Custom OpenAI-compatible endpoints are rarely first-party OpenAI, and
+    // many (GLM, Qwen, etc.) reject the "developer" role with a 400.  pi-ai's
+    // auto-detection defaults supportsDeveloperRole to true for non-standard
+    // custom providers, so we force it false unless the provider explicitly
+    // opts in.  Provider-level > model-level precedence is preserved by the
+    // spread order below.
+    const providerCompat = { supportsDeveloperRole: false, ...(pv.compat ?? {}) };
 
     // Read the actual API key from auth.json so registerProvider
     // gets the resolved key, not a provider name or env var reference.

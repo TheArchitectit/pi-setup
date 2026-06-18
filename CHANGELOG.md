@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.9] - 2026-05-29
+
+### Fixed
+
+- **Custom providers sent `developer` role and got 400 from GLM-family models** — pi-ai's auto-detection defaults `supportsDeveloperRole` to `true` for non-standard custom OpenAI-compatible endpoints, but many (GLM, Qwen, etc.) reject the `developer` role with "Model X does not support messages with role 'developer'. Use role 'system' instead." `applyProviders` now defaults `supportsDeveloperRole: false` for custom providers unless explicitly opted in via `compat`, so `system` is used instead. Provider/model-level opt-ins still override
+
+---
+
 ## [0.0.8] - 2026-05-29
 
 ### Fixed
