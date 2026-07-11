@@ -116,6 +116,16 @@ if [ "$UNINSTALL" = true ]; then
         info "Removing $PI_INSTALL_DIR/pi"
         sudo rm "$PI_INSTALL_DIR/pi" 2>/dev/null || rm "$PI_INSTALL_DIR/pi"
     fi
+    # Remove the pi-setup symlink from any PATH dir it may live in.
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    for d in $(echo "${PATH:-}" | tr ':' ' '); do
+        [ -L "$d/pi-setup" ] || continue
+        target="$(readlink -f "$d/pi-setup" 2>/dev/null || echo "")"
+        if [ "$target" = "$(readlink -f "$SCRIPT_DIR/pi-setup" 2>/dev/null)" ]; then
+            info "Removing $d/pi-setup"
+            rm -f "$d/pi-setup"
+        fi
+    done
     if [ -d "$PI_CONFIG_DIR" ]; then
         info "Removing config directory $PI_CONFIG_DIR"
         rm -rf "$PI_CONFIG_DIR"
@@ -188,6 +198,41 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Symlink the standalone wizard onto PATH
+# ---------------------------------------------------------------------------
+
+step "Linking pi-setup onto PATH"
+
+PI_SETUP_BIN="$SCRIPT_DIR/pi-setup"
+
+# Find the first writable directory already on PATH, else fall back to PI_INSTALL_DIR.
+path_link_dir=""
+if [ -n "${PATH:-}" ]; then
+    IFS=':' read -ra _path_dirs <<< "$PATH"
+    for d in "${_path_dirs[@]}"; do
+        [ -z "$d" ] && continue
+        if [ -d "$d" ] && [ -w "$d" ]; then
+            path_link_dir="$d"
+            break
+        fi
+    done
+fi
+if [ -z "$path_link_dir" ]; then
+    path_link_dir="${PI_INSTALL_DIR:-/usr/local/bin}"
+fi
+
+if [ ! -f "$PI_SETUP_BIN" ]; then
+    warn "Could not find pi-setup at $PI_SETUP_BIN — skipping PATH link"
+elif ! mkdir -p "$path_link_dir" 2>/dev/null; then
+    warn "Cannot write to $path_link_dir — skipping PATH link"
+    info "  Run manually: ln -sf $PI_SETUP_BIN /usr/local/bin/pi-setup"
+else
+    chmod +x "$PI_SETUP_BIN"
+    ln -sf "$PI_SETUP_BIN" "$path_link_dir/pi-setup"
+    ok "Linked pi-setup -> $path_link_dir/pi-setup"
+fi
+
+# ---------------------------------------------------------------------------
 # Development setup
 # ---------------------------------------------------------------------------
 
@@ -244,38 +289,16 @@ fi
 if [ "$RUN_CONFIG" = true ]; then
     step "Configuration wizard"
 
-    mkdir -p "$PI_CONFIG_DIR"
-
-    ask "Default model (claude|openai|ollama)"
-    read -r DEFAULT_MODEL
-    DEFAULT_MODEL=${DEFAULT_MODEL:-claude}
-
-    ask "Enable auto-save? (y/n)"
-    read -r AUTO_SAVE
-    case "$AUTO_SAVE" in
-        [Yy]*) AUTO_SAVE="true" ;;
-        *) AUTO_SAVE="false" ;;
-    esac
-
-    ask "Enable telemetry? (y/n)"
-    read -r TELEMETRY
-    case "$TELEMETRY" in
-        [Yy]*) TELEMETRY="true" ;;
-        *) TELEMETRY="false" ;;
-    esac
-
-    # Write config
-    cat > "$PI_CONFIG_DIR/config.json" <<EOF
-{
-  "defaultModel": "$DEFAULT_MODEL",
-  "autoSave": $AUTO_SAVE,
-  "telemetry": $TELEMETRY,
-  "extensions": [],
-  "skills": ["hello"]
-}
-EOF
-
-    ok "Configuration saved to ~/.config/pi/config.json"
+    # Delegate to the standalone pi-setup wizard, which writes the current
+    # ~/.pi/agent/{models.json,auth.json,settings.json} schema.
+    if [ -f "$SCRIPT_DIR/pi-setup" ]; then
+        exec python3 "$SCRIPT_DIR/pi-setup"
+    elif [ -f "$SCRIPT_DIR/setup.sh" ]; then
+        exec "$SCRIPT_DIR/setup.sh"
+    else
+        error "Could not find pi-setup wizard"
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -293,9 +316,9 @@ info "  pi --help"
 
 # Check if this is a first-time install (no providers configured)
 if [ ! -f "$PI_AGENT_DIR/models.json" ] || ! grep -q '"providers"' "$PI_AGENT_DIR/models.json" 2>/dev/null; then
-    printf '\n%sFirst time?%s The setup wizard will launch automatically when you start pi.\n' "${COLOR_BOLD}" "${COLOR_RESET}"
-    info "  You can also run /setup inside pi at any time."
-    info "  Or run: ./setup.sh   for the standalone shell wizard"
+    printf '\n%sFirst time?%s Configure a provider before starting pi.\n' "${COLOR_BOLD}" "${COLOR_RESET}"
+    info "  Run: ./pi-setup       (or: ./setup.sh)"
+    info "  Then start pi and use /setup to make changes."
 fi
 
 # Check for API keys

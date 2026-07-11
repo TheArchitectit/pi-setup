@@ -1,5 +1,27 @@
 # Release Notes
 
+## v0.0.9 (0.0.10)
+
+### First-run bootstrap with the standalone wizard
+
+`pi` exits immediately when no provider/model is configured, so the `/setup` extension never gets a chance to run on first launch. This release makes the standalone `pi-setup` wizard the canonical first-run path:
+
+- The extension's first-run message now tells users to run `pi-setup` before starting `pi`.
+- `install.sh` symlinks `pi-setup` onto your `PATH` (and `--uninstall` removes it), so `pi-setup` is a global command.
+- `setup.sh` is now a thin wrapper around `pi-setup` (the old bash wizard wrote a stale config schema).
+- `install.sh --config` delegates to `pi-setup`.
+
+### Fixes in `pi-setup`
+
+- **API type normalization** — `anthropic` → `anthropic-messages` so values match the extension.
+- **`$` escaping** — API keys containing `$` are now stored as `$$` in `auth.json`, matching the extension fix (the Python side was previously unescaped).
+- **`compat` field** — each provider is written with `compat.supportsDeveloperRole: false`.
+- **Local providers preserved** — Ollama/no-key endpoints are no longer deleted on exit; a warning is shown instead.
+- **Default model auto-select** — if the user skips default selection, the first model is selected so `pi` can start.
+- **Duplicate model IDs** rejected within a provider.
+
+---
+
 ## v0.0.7
 
 ### Fix: Pi v0.76+ API key resolution

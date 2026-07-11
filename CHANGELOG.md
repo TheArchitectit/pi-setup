@@ -7,6 +7,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.0.10] - 2026-07-10
+
+### Added
+
+- **First-run bootstrap via standalone `pi-setup` wizard** — because `pi` exits when no provider is configured, the extension's first-run message now tells users to run `pi-setup` (standalone) before starting `pi`. The `/setup` extension then becomes available for later edits
+- **`pi-setup` linked onto `PATH` by `install.sh`** — after installing the extension, the script symlinks `pi-setup` into the first writable `PATH` directory (falling back to `/usr/local/bin`), so `pi-setup` is a global command. `--uninstall` removes the symlink
+- **`setup.sh` rewritten as a thin wrapper** around `pi-setup` (the previous bash wizard wrote a stale `~/.config/pi/config.json` schema)
+- **`install.sh --config` now delegates to `pi-setup`** instead of writing the old config schema
+
+### Fixed
+
+- **`pi-setup` API type normalization** — `anthropic` is normalized to `anthropic-messages` so values match what the `/setup` extension expects
+- **`pi-setup` now escapes `$` as `$$` in stored API keys** — matches the `extensions/setup.ts` fix so Pi's resolver treats keys with `$` as literal (the Python side was previously unescaped)
+- **`pi-setup` writes `compat.supportsDeveloperRole: false`** on each provider, keeping `models.json` self-consistent
+- **No-key providers preserved** — local/Ollama endpoints without an API key are no longer deleted on exit; a warning is shown instead
+- **`pi-setup` auto-selects a default model** when the user skips default selection, so `pi` can start
+- **Duplicate model IDs rejected** within a provider
+- **First-run guidance in `install.sh`** no longer falsely claims the wizard auto-launches
+
+---
+
 ## [0.0.9] - 2026-05-29
 
 ### Fixed

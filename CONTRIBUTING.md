@@ -92,9 +92,14 @@ We are in **alpha** — comprehensive manual testing is critical. Please follow 
 # Ensure clean state
 rm -f ~/.pi/agent/extensions/setup.ts
 rm -f ~/.pi/agent/models.json
+rm -f ~/.pi/agent/auth.json
+rm -f ~/.pi/agent/settings.json
 
 # Install
 cp extensions/setup.ts ~/.pi/agent/extensions/
+
+# Create initial provider config (required before pi can start)
+./pi-setup
 
 # Start pi
 pi
@@ -150,12 +155,12 @@ cat ~/.pi/agent/settings.json | python3 -m json.tool
 
 | # | Test Case | Steps | Expected Result |
 |---|-----------|-------|-----------------|
-| 1 | Fresh install | Delete `models.json`, run `/setup` | Wizard completes, config created |
+| 1 | Fresh install | Delete `models.json`, run `./pi-setup` | Wizard creates config before pi starts |
 | 2 | Existing config | Run `/setup` with existing providers | Existing providers shown, no data lost |
 | 3 | Add Anthropic provider | Full add workflow with Claude models | Provider + models saved correctly |
 | 4 | Add OpenAI provider | Full add workflow with GPT models | Provider + models saved correctly |
 | 5 | Add Google provider | Full add workflow with Gemini models | Provider + models saved correctly |
-| 6 | Add Ollama provider | Base URL `http://localhost:11434/v1`, no key | Provider saved with chat-completions API |
+| 6 | Add Ollama provider | Base URL `http://localhost:11434/v1`, no key | Provider saved; not deleted on exit |
 | 7 | Add custom provider | Any OpenAI-compatible endpoint | Provider saved with correct API type |
 | 8 | Edit provider models | Add 2 models, remove 1 | Only kept model in config |
 | 9 | Remove provider | Delete a provider | Provider gone from models.json |
@@ -167,7 +172,7 @@ cat ~/.pi/agent/settings.json | python3 -m json.tool
 | 15 | Missing config dir | Delete `~/.pi/agent/`, run setup | Directories created |
 | 16 | Provider persistence | Exit pi, restart, check providers | Saved providers still registered |
 | 17 | Multi-provider | Add 2+ providers with different APIs | Both registered, switchable |
-| 18 | Shell script standalone | Run `./setup.sh` without pi | Config files created correctly |
+| 18 | Shell script standalone | Run `./pi-setup` (or `./setup.sh`) without pi | Config files created correctly |
 | 19 | Escape at prompts | Press Escape at various points | Graceful handling, no crash |
 | 20 | Large model list | Add 10+ models to a provider | All saved, UI navigable |
 

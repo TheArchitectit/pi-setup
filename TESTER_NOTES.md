@@ -45,18 +45,19 @@ pi-setup
 - After the model is added, it should ask "Set as default model?"
 - Answering yes should set it and show confirmation
 
-### 6. Provider cleanup on exit
+### 6. No-key providers preserved
 
-- Configure a provider with an empty or invalid API key
+- Configure a provider with an empty or invalid API key (e.g., a local Ollama endpoint)
 - Quit the wizard
-- Re-run `pi-setup` — the provider should be removed (no valid auth key)
+- Re-run `pi-setup` — the provider should still be listed and not removed
 
 ### 7. First-run experience
 
 - Delete `~/.pi/agent/models.json` and `~/.pi/agent/auth.json`
-- Run `pi-setup`
+- Run `./pi-setup`
 - Should prompt for provider name immediately
 - After completing wizard, config files should exist with correct content
+- `pi` should now start and the `/setup` extension should be available
 
 ### 8. Config file correctness
 
@@ -74,14 +75,18 @@ pi-setup
 ## How to Test
 
 ```bash
-# Install
-pip install pi-setup   # or just copy pi-setup to PATH
+# Run the standalone wizard directly
+./pi-setup
 
-# Or run directly
-python3 pi-setup
+# Or via the bash wrapper
+./setup.sh
 
-# Or after install.sh
+# Or install the extension and run it inside pi after initial setup
 ./install.sh
+cp extensions/setup.ts ~/.pi/agent/extensions/
+./pi-setup   # create initial provider/config
+pi
+/setup
 ```
 
 ## Bug Reports
