@@ -18,11 +18,13 @@
 #      missing (this is exactly the missing-bundle regression we prevent).
 #   5. Bump package.json + package-lock.json version to <new-version>.
 #   6. Commit the version bump (package.json + package-lock.json + dist).
-#   7. Tag (annotated) + push BEFORE publish — a push failure aborts before
-#      an irreversible npm publish.
-#   8. npm publish (the only valid distribution path).
-#   9. Create GitHub release with notes from the commit log.
-#  10. Print post-publish device instructions.
+#   7. Land on main FIRST: checkout main, fast-forward merge the source
+#      branch into main, push main. A push failure aborts before any tag is
+#      created or npm publish runs (publish is irreversible).
+#   8. Tag (annotated) on main + push the tag.
+#   9. npm publish (the only valid distribution path).
+#  10. Create GitHub release (targeting main) with notes from the commit log.
+#  11. Print post-publish device instructions.
 #
 # Distribution is npm-only. NEVER produce or rely on a .tgz tarball
 # (`npm pack`) for shipping, and NEVER symlink into ~/.pi/agent/extensions/
@@ -126,33 +128,56 @@ Release v$NEW_VERSION published via scripts/deploy.sh.
 Co-Authored-By: pi-setup deploy.sh <noreply@pi-setup>"
 fi
 
-# --- 7. tag + push BEFORE publish --------------------------------------------
+# --- 7. land on main FIRST, then push main BEFORE tagging ------------------
+# The trunk (main) is the canonical release branch. Fast-forward main to the
+# release commit and push it before creating any tag — so the commit that a
+# tag will point at is already on the trunk. If this push fails, we abort
+# before the irreversible npm publish (publish cannot be undone).
+SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TRUNK_BRANCH="main"
+
+if [[ "$SOURCE_BRANCH" == "$TRUNK_BRANCH" ]]; then
+	echo "[deploy] already on $TRUNK_BRANCH — no merge needed."
+else
+	echo "[deploy] landing release commit on $TRUNK_BRANCH (ff-merge from $SOURCE_BRANCH)"
+	git checkout "$TRUNK_BRANCH"
+	# fast-forward only: if main has diverged, abort so the user resolves manually
+	if ! git merge --ff-only "$SOURCE_BRANCH"; then
+		echo "[deploy] ERROR: cannot fast-forward $TRUNK_BRANCH onto $SOURCE_BRANCH." >&2
+		echo "[deploy]        $TRUNK_BRANCH has diverged. Rebase/merge $SOURCE_BRANCH onto $TRUNK_BRANCH first, then re-run." >&2
+		git checkout "$SOURCE_BRANCH"
+		exit 1
+	fi
+fi
+
+echo "[deploy] pushing $TRUNK_BRANCH"
+if ! git push origin "$TRUNK_BRANCH" 2>/dev/null; then
+	echo "[deploy] ERROR: push of $TRUNK_BRANCH failed — aborting before tagging/publish." >&2
+	git checkout "$SOURCE_BRANCH" 2>/dev/null || true
+	exit 1
+fi
+
+# --- 8. tag on main + push the tag ------------------------------------------
 TAG="v$NEW_VERSION"
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
 	echo "[deploy] tag $TAG already exists; skipping tag creation."
 else
-	echo "[deploy] creating tag $TAG"
+	echo "[deploy] creating tag $TAG on $TRUNK_BRANCH"
 	git tag -a "$TAG" -m "Release v$NEW_VERSION"
 fi
-echo "[deploy] pushing commits + tags (git push --follow-tags)"
-if ! git push --follow-tags 2>/dev/null; then
-	echo "[deploy] git push --follow-tags failed; setting upstream and retrying"
-	CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-	git push --set-upstream origin "$CURRENT_BRANCH" --follow-tags
+echo "[deploy] pushing tag $TAG"
+if ! git push origin "$TAG" 2>/dev/null; then
+	echo "[deploy] ERROR: push of tag $TAG failed — aborting before publish." >&2
+	git checkout "$SOURCE_BRANCH" 2>/dev/null || true
+	exit 1
 fi
 
-# --- 7b. verify the tag reached origin ----------------------------------------
-if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-	echo "[deploy] pushing tag $TAG explicitly (not found on origin after --follow-tags)"
-	git push origin "$TAG"
-fi
-
-# --- 8. publish (npm only) ----------------------------------------------------
+# --- 9. publish (npm only) ----------------------------------------------------
 echo "[deploy] publishing to npm (npm publish — the only valid distribution path)"
 npm publish
 echo "[deploy] published v$NEW_VERSION to npm."
 
-# --- 9. create GitHub release with notes ------------------------------------
+# --- 10. create GitHub release (targeting main) with notes -------------------
 PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
 if [ -n "$PREV_TAG" ]; then
 	RELEASE_NOTES=$(git log --pretty=format:"- %s" "$PREV_TAG..$TAG" 2>/dev/null | grep -vE "^- chore\(release\)|^- chore: (sync|clean|rebuild)" | sed -n '1,15p' || true)
@@ -161,16 +186,23 @@ else
 fi
 RELEASE_NOTES="${RELEASE_NOTES:-(no commit notes extracted)}"
 if command -v gh >/dev/null 2>&1; then
-	echo "[deploy] creating GitHub release $TAG with notes"
-	gh release create "$TAG" --target "$(git rev-list -n 1 "$TAG")" \
-		--title "v$NEW_VERSION" \
-		--notes "$(printf '## What changed\n\n%s\n\n**Install:** \`pi update --extensions\`' "$RELEASE_NOTES")" \
-		2>/dev/null || echo "[deploy] WARN: gh release create failed (gh not authenticated or release exists) — skipping"
+echo "[deploy] creating GitHub release $TAG on $TRUNK_BRANCH with notes"
+gh release create "$TAG" --target "$TRUNK_BRANCH" \
+--title "v$NEW_VERSION" \
+--notes "$(printf '## What changed\n\n%s\n\n**Install:** \`pi update --extensions\`' "$RELEASE_NOTES")" \
+2>/dev/null || echo "[deploy] WARN: gh release create failed (gh not authenticated or release exists) — skipping"
 else
-	echo "[deploy] WARN: gh CLI not installed — skipping GitHub release creation. Tag $TAG is pushed."
+echo "[deploy] WARN: gh CLI not installed — skipping GitHub release creation. Tag $TAG is on $TRUNK_BRANCH."
 fi
 
-# --- 10. post-publish device instructions ------------------------------------
+# --- 11. restore source branch ----------------------------------------------
+# Return to the branch the deploy was started from so the working tree is left
+# where the user expected it.
+if [[ "$SOURCE_BRANCH" != "$TRUNK_BRANCH" ]]; then
+git checkout "$SOURCE_BRANCH" 2>/dev/null || true
+fi
+
+# --- 12. post-publish device instructions ------------------------------------
 echo
 echo "============================================================"
 echo " PUBLISHED v$NEW_VERSION — post-publish device steps"
