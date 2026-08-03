@@ -62,11 +62,4 @@ export interface DashboardLink {
   alive: boolean;
 }
 
-/** Route context passed to all handlers. */
-export interface RouteContext {
-  snapshotPath: string;
-  stateDir: string;
-  serverVersion: string;
-  links: DashboardLink[];
-  detectLinks: () => Promise<DashboardLink[]>;
-}
+// RouteContext lives in routes.ts (server-only; closes over the fetch loop).

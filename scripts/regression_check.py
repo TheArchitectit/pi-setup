@@ -1,0 +1,507 @@
+#!/usr/bin/env python3
+"""
+Regression Check Tool for pi-setup.
+
+Scans staged/unstaged changes against a failure registry to detect potential
+regressions, and enforces file-size limits on extensions/.
+
+This is a slimmed port of pi-mega-compact's scripts/regression_check.py —
+the mega-specific "settings coverage" check (MEGACOMPACT_* env var ↔ dashboard
+SETTINGS array) is dropped because pi-setup has no env-var-driven settings
+surface.
+
+Usage:
+    python scripts/regression_check.py              # Check staged changes
+    python scripts/regression_check.py --unstaged   # Check unstaged changes
+    python scripts/regression_check.py --all        # Check all changes
+    python scripts/regression_check.py --pre-commit # Exit with error code if issues found
+
+Environment Variables:
+    FAILURE_REGISTRY_PATH: Path to registry file
+    PREVENTION_RULES_PATH: Path to prevention rules directory
+"""
+
+import argparse
+import fnmatch
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+DEFAULT_REGISTRY_PATH = Path(".guardrails/failure-registry.jsonl")
+DEFAULT_RULES_PATH = Path(".guardrails/prevention-rules")
+
+
+# File-size limits.
+# pi-setup has no src/ — only extensions/ (setup.ts, dashboard-server/*).
+# EXT_SOFT/EXT_HARD tuned so the current ~614-line setup.ts passes while still
+# catching runaway growth; tests get a higher ceiling.
+FILE_SIZE_DIRS = ("extensions",)
+FILE_SIZE_SKIP_PARTS = ("node_modules", "dist", ".claude", "worktrees", "dashboard-client")
+FILE_SIZE_SKIP_SUFFIXES = (".d.ts",)
+EXT_SOFT = 400
+EXT_HARD = 700
+TEST_HARD = 800
+
+
+def _classify_file(rel_path: str) -> tuple[int | None, int | None]:
+    """Return (soft, hard) line limits for a repo-relative .ts/.tsx path, or
+    (None, None) if the file should be skipped."""
+    parts = rel_path.split(os.sep)
+    for skip in FILE_SIZE_SKIP_PARTS:
+        if skip in parts:
+            return (None, None)
+    for suf in FILE_SIZE_SKIP_SUFFIXES:
+        if rel_path.endswith(suf):
+            return (None, None)
+    is_test = rel_path.endswith((".test.ts", ".test.tsx"))
+    if rel_path.startswith("extensions" + os.sep):
+        return (EXT_SOFT, TEST_HARD if is_test else EXT_HARD)
+    return (None, None)
+
+
+def check_file_sizes(repo_root: Path) -> list[dict]:
+    """Scan extensions/ for files over soft/hard line limits.
+
+    Returns a list of issue dicts: {file, lines, soft, hard, severity,
+    kind}. severity is 'error' (over hard) or 'warning' (over soft only).
+    Sorted: hard-limit violations first (by line count desc), then warnings.
+    """
+    violations: list[dict] = []
+    warnings: list[dict] = []
+
+    for top in FILE_SIZE_DIRS:
+        base = repo_root / top
+        if not base.is_dir():
+            continue
+        for dirpath, _dirnames, filenames in os.walk(base):
+            for name in filenames:
+                if not (name.endswith(".ts") or name.endswith(".tsx")):
+                    continue
+                abs_path = Path(dirpath) / name
+                try:
+                    rel_path = abs_path.relative_to(repo_root).as_posix()
+                except ValueError:
+                    continue
+                soft, hard = _classify_file(rel_path)
+                if hard is None:
+                    continue
+                try:
+                    with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                        line_count = sum(1 for _ in f)
+                except OSError:
+                    continue
+                if line_count > hard:
+                    violations.append({
+                        "file": rel_path,
+                        "lines": line_count,
+                        "soft": soft,
+                        "hard": hard,
+                        "severity": "error",
+                        "kind": "hard",
+                    })
+                elif soft is not None and line_count > soft:
+                    warnings.append({
+                        "file": rel_path,
+                        "lines": line_count,
+                        "soft": soft,
+                        "hard": hard,
+                        "severity": "warning",
+                        "kind": "soft",
+                    })
+
+    violations.sort(key=lambda d: d["lines"], reverse=True)
+    warnings.sort(key=lambda d: d["lines"], reverse=True)
+    return violations + warnings
+
+
+def print_file_size_report(size_issues: list[dict]) -> None:
+    """Print formatted report of file-size issues."""
+    if not size_issues:
+        print("✓ All source files within soft/hard line limits")
+        return
+
+    hard_count = sum(1 for i in size_issues if i["kind"] == "hard")
+    soft_count = sum(1 for i in size_issues if i["kind"] == "soft")
+
+    print("\n" + "=" * 70)
+    print("FILE-SIZE CHECK")
+    print("=" * 70)
+
+    for issue in size_issues:
+        severity = format_severity(issue["severity"])
+        tag = "OVER HARD LIMIT" if issue["kind"] == "hard" else "over soft limit"
+        print(f"  {severity}  {issue['file']}  ({issue['lines']} lines, "
+              f"limit {issue['hard'] if issue['kind'] == 'hard' else issue['soft']})  {tag}")
+
+    print("-" * 70)
+    print(f"  {hard_count} over hard limit (blocks commit), {soft_count} over soft limit (warning)")
+    print("=" * 70)
+
+
+def run_git_command(args: list[str]) -> tuple[int, str, str]:
+    """Run a git command and return (returncode, stdout, stderr)."""
+    try:
+        result = subprocess.run(
+            ["git"] + args,
+            capture_output=True,
+            text=True,
+            cwd=Path.cwd()
+        )
+        return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError:
+        return 1, "", "git command not found"
+
+
+def get_changed_files(staged: bool = True, unstaged: bool = False) -> list[str]:
+    """Get list of changed files from git."""
+    files = []
+
+    if staged:
+        rc, stdout, _ = run_git_command(["diff", "--cached", "--name-only"])
+        if rc == 0:
+            files.extend(stdout.strip().split("\n") if stdout.strip() else [])
+
+    if unstaged:
+        rc, stdout, _ = run_git_command(["diff", "--name-only"])
+        if rc == 0:
+            files.extend(stdout.strip().split("\n") if stdout.strip() else [])
+
+    return list(set(f for f in files if f))
+
+
+def get_diff_content(file_path: str, staged: bool = True) -> str:
+    """Get diff content for a specific file."""
+    cmd = ["diff", "--cached"] if staged else ["diff"]
+    rc, stdout, _ = run_git_command(cmd + ["--", file_path])
+    return stdout if rc in (0, 1) else ""
+
+
+def load_failure_registry(registry_path: Path) -> list[dict]:
+    """Load failure entries from registry."""
+    if not registry_path.exists():
+        return []
+
+    entries = []
+    try:
+        f = open(registry_path, "r")
+    except OSError:
+        return entries
+    with f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                try:
+                    entry = json.loads(line)
+                    if entry.get("status") == "active":
+                        entries.append(entry)
+                except json.JSONDecodeError:
+                    continue
+    return entries
+
+
+def validate_rule_regex(rule: dict) -> bool:
+    """Validate regex patterns in a rule."""
+    pattern = rule.get("pattern", "")
+    if pattern:
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            print(f"Warning: Invalid regex in rule {rule.get('rule_id')}: {e}")
+            return False
+
+    forbidden = rule.get("forbidden_context", "")
+    if forbidden:
+        try:
+            re.compile(forbidden)
+        except re.error as e:
+            print(f"Warning: Invalid forbidden_context in rule {rule.get('rule_id')}: {e}")
+            return False
+
+    return True
+
+
+def load_prevention_rules(rules_path: Path) -> list[dict]:
+    """Load prevention rules from rules directory."""
+    rules = []
+
+    pattern_rules_file = rules_path / "pattern-rules.json"
+    if pattern_rules_file.exists():
+        try:
+            with open(pattern_rules_file, "r") as f:
+                data = json.load(f)
+                for rule in data.get("rules", []):
+                    if rule.get("enabled", True):
+                        if validate_rule_regex(rule):
+                            rule["rule_type"] = "pattern"
+                            rules.append(rule)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    semantic_rules_file = rules_path / "semantic-rules.json"
+    if semantic_rules_file.exists():
+        try:
+            with open(semantic_rules_file, "r") as f:
+                data = json.load(f)
+                for rule in data.get("rules", []):
+                    if rule.get("enabled", True):
+                        rule["rule_type"] = "semantic"
+                        rules.append(rule)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return rules
+
+
+def check_file_against_failures(
+    file_path: str,
+    failures: list[dict]
+) -> list[dict]:
+    """Check if file is in affected_files of any active failure."""
+    matching_failures = []
+
+    for failure in failures:
+        affected_files = failure.get("affected_files", [])
+        for affected in affected_files:
+            if fnmatch.fnmatch(file_path, affected):
+                matching_failures.append(failure)
+                break
+
+    return matching_failures
+
+
+def check_diff_against_patterns(
+    diff_content: str,
+    rules: list[dict]
+) -> list[dict]:
+    """Check diff content against pattern rules."""
+    violations = []
+
+    # Extract added lines only (lines starting with +)
+    added_lines = []
+    for line in diff_content.split("\n"):
+        if line.startswith("+") and not line.startswith("+++"):
+            added_lines.append(line[1:])  # Remove the + prefix
+
+    added_content = "\n".join(added_lines)
+
+    for rule in rules:
+        if rule.get("rule_type") != "pattern":
+            continue
+
+        pattern = rule.get("pattern")
+        if not pattern:
+            continue
+
+        try:
+            if re.search(pattern, added_content, re.MULTILINE):
+                forbidden = rule.get("forbidden_context")
+                if forbidden and re.search(forbidden, added_content, re.MULTILINE):
+                    continue  # Context suggests this is OK
+
+                violations.append({
+                    "rule_id": rule.get("rule_id"),
+                    "name": rule.get("name"),
+                    "message": rule.get("message"),
+                    "severity": rule.get("severity", "warning"),
+                    "suggestion": rule.get("suggestion"),
+                    "failure_id": rule.get("failure_id"),
+                })
+        except re.error:
+            continue  # Invalid regex, skip
+
+    return violations
+
+
+def format_severity(severity: str) -> str:
+    """Format severity with color codes (if terminal supports it)."""
+    colors = {
+        "critical": "\033[91m",  # Red
+        "high": "\033[93m",      # Yellow
+        "medium": "\033[94m",    # Blue
+        "low": "\033[90m",       # Gray
+        "error": "\033[91m",
+        "warning": "\033[93m",
+    }
+    reset = "\033[0m"
+
+    if sys.stdout.isatty():
+        return f"{colors.get(severity.lower(), '')}{severity.upper()}{reset}"
+    return severity.upper()
+
+
+def run_regression_check(
+    registry_path: Path,
+    rules_path: Path,
+    staged: bool = True,
+    unstaged: bool = False,
+    verbose: bool = False
+) -> tuple[int, list[dict]]:
+    """
+    Run full regression check.
+    Returns (issue_count, issues_details).
+    """
+    issues = []
+
+    failures = load_failure_registry(registry_path)
+    rules = load_prevention_rules(rules_path)
+
+    if verbose:
+        print(f"Loaded {len(failures)} active failures, {len(rules)} enabled rules")
+
+    changed_files = get_changed_files(staged=staged, unstaged=unstaged)
+
+    if not changed_files:
+        if verbose:
+            print("No changed files to check")
+        return 0, []
+
+    if verbose:
+        print(f"Checking {len(changed_files)} changed file(s)...")
+
+    for file_path in changed_files:
+        file_issues = {
+            "file": file_path,
+            "failures": [],
+            "violations": [],
+        }
+
+        matching_failures = check_file_against_failures(file_path, failures)
+        if matching_failures:
+            file_issues["failures"] = matching_failures
+
+        diff = get_diff_content(file_path, staged=staged)
+        if diff:
+            violations = check_diff_against_patterns(diff, rules)
+            if violations:
+                file_issues["violations"] = violations
+
+        if file_issues["failures"] or file_issues["violations"]:
+            issues.append(file_issues)
+
+    return len(issues), issues
+
+
+def print_report(issues: list[dict], verbose: bool = False):
+    """Print formatted report of issues."""
+    if not issues:
+        print("\n✓ No potential regressions detected")
+        return
+
+    print("\n" + "=" * 70)
+    print("REGRESSION CHECK REPORT")
+    print("=" * 70)
+
+    for issue in issues:
+        file_path = issue["file"]
+        print(f"\n📄 {file_path}")
+        print("-" * 70)
+
+        for failure in issue["failures"]:
+            severity = format_severity(failure.get("severity", "medium"))
+            print(f"\n  ⚠️  {severity} - Known Bug History")
+            print(f"      Failure ID: {failure['failure_id']}")
+            print(f"      Category: {failure.get('category', 'unknown')}")
+            print(f"      Previous Error: {failure.get('error_message', 'N/A')[:80]}...")
+            print(f"      Prevention: {failure.get('prevention_rule', 'N/A')}")
+
+        for violation in issue["violations"]:
+            severity = format_severity(violation.get("severity", "warning"))
+            print(f"\n  🚫 {severity} - Pattern Violation")
+            print(f"      Rule: {violation.get('name', 'Unknown')}")
+            print(f"      Message: {violation.get('message', 'N/A')}")
+            if violation.get("failure_id"):
+                print(f"      Related Failure: {violation['failure_id']}")
+            if violation.get("suggestion"):
+                print(f"      Suggestion: {violation['suggestion']}")
+
+    print("\n" + "=" * 70)
+    print(f"Total files with potential issues: {len(issues)}")
+    print("=" * 70)
+    print("\nReview the above carefully before committing.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check for potential regressions in changed pi-setup code",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    %(prog)s                    # Check staged changes
+    %(prog)s --unstaged         # Check unstaged changes
+    %(prog)s --all              # Check all changes
+    %(prog)s --pre-commit       # Exit with non-zero code if issues found
+        """
+    )
+
+    parser.add_argument("--registry", "-r", type=Path,
+                        default=Path(os.getenv("FAILURE_REGISTRY_PATH", DEFAULT_REGISTRY_PATH)),
+                        help="Path to failure registry")
+    parser.add_argument("--rules", type=Path,
+                        default=Path(os.getenv("PREVENTION_RULES_PATH", DEFAULT_RULES_PATH)),
+                        help="Path to prevention rules directory")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--staged", action="store_true", default=True,
+                       help="Check staged changes (default)")
+    group.add_argument("--unstaged", "-u", action="store_true",
+                       help="Check unstaged changes")
+    group.add_argument("--all", "-a", action="store_true",
+                       help="Check both staged and unstaged changes")
+
+    parser.add_argument("--pre-commit", action="store_true",
+                        help="Exit with non-zero code if issues found (for pre-commit hooks)")
+    parser.add_argument("--json", action="store_true",
+                        help="Output results as JSON")
+    parser.add_argument("--no-file-sizes", action="store_true",
+                        help="Skip the file-size scan of extensions/")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Verbose output")
+    parser.add_argument("--quiet", "-q", action="store_true",
+                        help="Only output on issues found")
+
+    args = parser.parse_args()
+
+    staged = args.staged and not args.unstaged and not args.all
+    unstaged = args.unstaged or args.all
+    if args.all:
+        staged = True
+
+    count, issues = run_regression_check(
+        registry_path=args.registry,
+        rules_path=args.rules,
+        staged=staged,
+        unstaged=unstaged,
+        verbose=args.verbose and not args.quiet
+    )
+
+    size_issues: list[dict] = []
+    size_hard_count = 0
+    if not args.no_file_sizes:
+        size_issues = check_file_sizes(Path.cwd())
+        size_hard_count = sum(1 for i in size_issues if i["kind"] == "hard")
+
+    if args.json:
+        print(json.dumps({
+            "issue_count": count,
+            "size_violations_hard": size_hard_count,
+            "issues": issues,
+            "file_sizes": size_issues,
+        }, indent=2))
+    else:
+        if not args.quiet or count > 0:
+            print_report(issues, verbose=args.verbose)
+        if size_issues and (not args.quiet or size_hard_count > 0):
+            print_file_size_report(size_issues)
+        elif not args.quiet and not size_issues and not args.json:
+            print_file_size_report(size_issues)
+
+    if args.pre_commit and (count > 0 or size_hard_count > 0):
+        sys.exit(1)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

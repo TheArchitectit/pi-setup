@@ -29,18 +29,44 @@
     "node": ">=18"
   },
   "files": [
+    "dist",
     "extensions",
+    "extensions/dashboard-client/dist",
     "setup.sh",
     "install.sh",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.js.map",
+    "!**/*.test.ts"
+  ],
+  "workspaces": [
+    "extensions/dashboard-client"
   ],
   "pi": {
     "extensions": [
       "./extensions/setup.ts"
     ]
   },
+  "scripts": {
+    "clean": "rm -rf dist extensions/dashboard-client/dist",
+    "prebuild": "npm run clean",
+    "build:server": "tsc -p tsconfig.json",
+    "build:dashboard": "npm run build -w extensions/dashboard-client",
+    "build": "npm run build:server && npm run build:dashboard",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck -w extensions/dashboard-client",
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "lint": "tsc --noEmit && python3 scripts/regression_check.py --all || true",
+    "guardrails": "python3 scripts/regression_check.py --all",
+    "deploy": "./scripts/deploy.sh",
+    "prepublishOnly": "npm run build"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.0",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.6.3"
   }
 }

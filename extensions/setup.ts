@@ -6,8 +6,8 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, unlinkSync } from "node:fs";
-import { join, dirname, sep } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, execSync } from "node:child_process";
 
@@ -410,7 +410,7 @@ async function editProvider(
   name: string,
   providers: Record<string, ProviderEntry>,
 ): Promise<"back" | void> {
-  let backToProvider = true;
+  const backToProvider = true;
   while (backToProvider) {
     const pv = providers[name];
     const action = await ui.select(`Edit "${name}":`, [
@@ -573,8 +573,8 @@ async function modelEditFlow(
     const reasoningPick = await ui.select("Supports reasoning?", ["Yes", "No"]);
 
     model.name = displayName || pick;
-    model.contextWindow = parseInt(ctxWindow, 10);
-    model.maxTokens = parseInt(maxOutput, 10);
+    model.contextWindow = parseInt(ctxWindow ?? "0", 10);
+    model.maxTokens = parseInt(maxOutput ?? "0", 10);
     model.reasoning = reasoningPick === "Yes";
     ui.notify(`Updated: ${pick}`, "info");
   } else if (action === "Remove") {

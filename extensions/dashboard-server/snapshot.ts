@@ -9,7 +9,7 @@
  * Also detects sibling dashboards (mega-compact on port 9320) for cross-linking.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { SetupSnapshot, ProviderEntry, SettingsSnapshot, AuthEntry, DashboardLink } from "./types.js";
@@ -97,7 +97,6 @@ export async function detectSiblingDashboards(): Promise<DashboardLink[]> {
         signal: AbortSignal.timeout(800),
       });
       if (res.ok) {
-        const j = (await res.json()) as { version?: string };
         links.push({
           name: "pi-mega-compact",
           url: `http://localhost:${port}`,
@@ -116,7 +115,7 @@ export async function detectSiblingDashboards(): Promise<DashboardLink[]> {
 }
 
 export function readSnapshot(
-  snapshotPath: string,
+  _snapshotPath: string,
   serverVersion: string,
   links: DashboardLink[],
 ): SetupSnapshot {
