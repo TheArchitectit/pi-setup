@@ -10,11 +10,7 @@
  */
 
 import { ENDPOINTS } from "@contracts";
-import type {
-	LinksResponse,
-	HealthResponse,
-	SetupSnapshot,
-} from "@contracts";
+import type { LinksResponse, HealthResponse, SetupSnapshot } from "@contracts";
 
 /** Error thrown when a dashboard API response is not 2xx. */
 export class ApiError extends Error {

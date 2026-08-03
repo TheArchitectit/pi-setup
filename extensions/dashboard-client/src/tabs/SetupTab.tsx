@@ -130,7 +130,13 @@ function SiblingDashboardsCard(): React.ReactElement | null {
 			<h2>Sibling dashboards (live)</h2>
 			<div className="cross-link-list">
 				{links.map((l) => (
-					<a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="badge">
+					<a
+						key={l.url}
+						href={l.url}
+						target="_blank"
+						rel="noreferrer"
+						className="badge"
+					>
 						{l.name} · :{l.port} →
 					</a>
 				))}

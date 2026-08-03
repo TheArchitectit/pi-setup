@@ -30,7 +30,9 @@ function loadJson(path: string): Record<string, unknown> {
 	}
 }
 
-export function readProviders(piDir: string = DEFAULT_PI_DIR): Record<string, ProviderEntry> {
+export function readProviders(
+	piDir: string = DEFAULT_PI_DIR,
+): Record<string, ProviderEntry> {
 	const data = loadJson(join(piDir, "models.json"));
 	// models.json has shape { providers: { name: { ... } } }
 	const root = (data.providers ?? data) as Record<string, unknown>;
@@ -59,7 +61,9 @@ export function readProviders(piDir: string = DEFAULT_PI_DIR): Record<string, Pr
 	return providers;
 }
 
-export function readSettings(piDir: string = DEFAULT_PI_DIR): SettingsSnapshot | null {
+export function readSettings(
+	piDir: string = DEFAULT_PI_DIR,
+): SettingsSnapshot | null {
 	const data = loadJson(join(piDir, "settings.json"));
 	if (!data || Object.keys(data).length === 0) return null;
 	return {
@@ -72,7 +76,9 @@ export function readSettings(piDir: string = DEFAULT_PI_DIR): SettingsSnapshot |
 	};
 }
 
-export function readAuth(piDir: string = DEFAULT_PI_DIR): Record<string, AuthEntry> {
+export function readAuth(
+	piDir: string = DEFAULT_PI_DIR,
+): Record<string, AuthEntry> {
 	const data = loadJson(join(piDir, "auth.json"));
 	const auth: Record<string, AuthEntry> = {};
 	for (const [name, entry] of Object.entries(data)) {

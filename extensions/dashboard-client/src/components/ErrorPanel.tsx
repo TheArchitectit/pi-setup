@@ -15,7 +15,10 @@ export interface ErrorPanelProps {
 	error: Error;
 }
 
-export function ErrorPanel({ title, error }: ErrorPanelProps): React.ReactElement {
+export function ErrorPanel({
+	title,
+	error,
+}: ErrorPanelProps): React.ReactElement {
 	const status = error instanceof ApiError ? error.status : null;
 	return (
 		<div className="error-fallback">

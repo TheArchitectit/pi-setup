@@ -43,13 +43,18 @@ const BLOCKING_LEVELS = new Set(["high", "critical"]);
 function main() {
 	let raw;
 	try {
-		raw = execSync("npm audit --json", { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+		raw = execSync("npm audit --json", {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "ignore"],
+		});
 	} catch (err) {
 		// npm audit exits non-zero when advisories exist; the JSON is on stdout.
 		raw = err.stdout ?? "";
 	}
 	if (!raw) {
-		console.error("[audit-gate] could not run `npm audit` — skipping gate (non-fatal)");
+		console.error(
+			"[audit-gate] could not run `npm audit` — skipping gate (non-fatal)",
+		);
 		process.exit(0);
 	}
 
@@ -57,7 +62,9 @@ function main() {
 	try {
 		data = JSON.parse(raw);
 	} catch {
-		console.error("[audit-gate] could not parse `npm audit --json` output — skipping gate (non-fatal)");
+		console.error(
+			"[audit-gate] could not parse `npm audit --json` output — skipping gate (non-fatal)",
+		);
 		process.exit(0);
 	}
 
@@ -87,24 +94,38 @@ function main() {
 	);
 
 	if (accepted.length > 0) {
-		console.error(`[audit-gate] ${accepted.length} accepted upstream advisories (non-blocking):`);
+		console.error(
+			`[audit-gate] ${accepted.length} accepted upstream advisories (non-blocking):`,
+		);
 		for (const a of accepted) {
 			console.error(`  - ${a.severity.toUpperCase()}  ${a.name}  ${a.url}`);
 		}
 	}
 
 	if (blocking.length > 0) {
-		console.error(`\n[audit-gate] ${blocking.length} blocking advisory/advisories found:`);
+		console.error(
+			`\n[audit-gate] ${blocking.length} blocking advisory/advisories found:`,
+		);
 		for (const a of blocking) {
-			console.error(`  - ${a.severity.toUpperCase()}  ${a.name}  ${a.title ?? ""}  ${a.url}`);
+			console.error(
+				`  - ${a.severity.toUpperCase()}  ${a.name}  ${a.title ?? ""}  ${a.url}`,
+			);
 		}
-		console.error("\nFix the above before publishing. If an advisory is upstream-only");
-		console.error("(nested in another package's dep tree, unfixable here), add its URL");
-		console.error("to ACCEPTED_UPSTREAM in scripts/audit-gate.mjs with a justification.");
+		console.error(
+			"\nFix the above before publishing. If an advisory is upstream-only",
+		);
+		console.error(
+			"(nested in another package's dep tree, unfixable here), add its URL",
+		);
+		console.error(
+			"to ACCEPTED_UPSTREAM in scripts/audit-gate.mjs with a justification.",
+		);
 		process.exit(1);
 	}
 
-	console.error("[audit-gate] no blocking advisories (high/critical, non-allowlisted)");
+	console.error(
+		"[audit-gate] no blocking advisories (high/critical, non-allowlisted)",
+	);
 	process.exit(0);
 }
 
