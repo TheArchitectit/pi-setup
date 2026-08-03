@@ -345,10 +345,12 @@ export default function (pi: ExtensionAPI) {
 			try {
 				mkdirSync(stateDir, { recursive: true });
 
-				// Resolve the dashboard-server entry point
+				// Resolve the dashboard-server entry point.
+				// Order matters: prefer the compiled .js when running from the
+				// published package (node can load it directly), fall back to the
+				// .ts source for dev checkouts (loaded via --experimental-strip-types).
 				const here = dirname(fileURLToPath(import.meta.url));
 				const candidates = [
-					join(here, "dashboard-server", "server.ts"),
 					join(
 						here,
 						"..",
@@ -357,7 +359,7 @@ export default function (pi: ExtensionAPI) {
 						"dashboard-server",
 						"server.js",
 					),
-					join(here, "dashboard-server", "server.js"),
+					join(here, "dashboard-server", "server.ts"),
 				];
 				const entry = candidates.find((p) => existsSync(p));
 				if (!entry) {
@@ -365,19 +367,22 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 
-				// Write a runner that imports the entry point
-				const runner = `import { launchDashboardServer } from "${entry.replace(/\.ts$/, ".js")}";\nlaunchDashboardServer("${stateDir}").catch((e) => { console.error(e); process.exit(1); });\n`;
+				// Write a runner that imports the resolved entry verbatim. Do NOT
+				// rewrite .ts→.js here — the compiled JS lives under dist/, NOT
+				// co-located with the source, so a rewrite would point at a
+				// non-existent file (the cause of "Dashboard failed to start").
+				const isTsEntry = entry.endsWith(".ts");
+				const runner = `import { launchDashboardServer } from "${entry}";\nlaunchDashboardServer("${stateDir}").catch((e) => { console.error(e); process.exit(1); });\n`;
 				writeFileSync(runnerFile, runner);
 
-				const child = spawn(
-					process.execPath,
-					["--experimental-strip-types", runnerFile, stateDir],
-					{
-						stdio: "ignore",
-						detached: true,
-						env: { ...process.env, PI_SETUP_DASHBOARD_PORT: String(DASH_BASE) },
-					},
-				);
+				const nodeArgs = isTsEntry
+					? ["--experimental-strip-types", runnerFile, stateDir]
+					: [runnerFile, stateDir];
+				const child = spawn(process.execPath, nodeArgs, {
+					stdio: "ignore",
+					detached: true,
+					env: { ...process.env, PI_SETUP_DASHBOARD_PORT: String(DASH_BASE) },
+				});
 
 				child.unref();
 
