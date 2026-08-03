@@ -111,11 +111,14 @@ else
 fi
 
 # --- 6. commit version bump + dashboard dist if changed ----------------------
-if git diff --quiet -- package.json package-lock.json extensions/dashboard-client/dist; then
-	echo "[deploy] nothing to commit (version already set, dist unchanged)."
+# NOTE: extensions/dashboard-client/dist is gitignored in pi-setup — npm
+# packs the freshly-built bundle from disk (verified in step 4), so it is
+# NOT committed to git (unlike pi-mega-compact, which un-ignores its dist).
+if git diff --quiet -- package.json package-lock.json; then
+	echo "[deploy] nothing to commit (version already set)."
 else
-	echo "[deploy] committing version bump + dashboard dist"
-	git add package.json package-lock.json extensions/dashboard-client/dist
+	echo "[deploy] committing version bump"
+	git add package.json package-lock.json
 	git commit -m "chore(release): v$NEW_VERSION
 
 Release v$NEW_VERSION published via scripts/deploy.sh.
