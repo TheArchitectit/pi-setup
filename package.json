@@ -1,6 +1,6 @@
 {
   "name": "pi-setup",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Setup wizard + dashboard for pi — configure providers, models, and defaults via /setup command, monitor config via /dashboard",
   "type": "module",
   "license": "BSD-3-Clause",
