@@ -29,5 +29,13 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
-# Local pi package installs
+# Local pi package installs + runtime state
 .pi/
+
+# pi-messenger / crew runtime state
+.crew/
+
+# SQLite runtime files (never commit)
+*.db
+*.db-wal
+*.db-shm
