@@ -24,3 +24,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+
+# Local pi package installs
+.pi/

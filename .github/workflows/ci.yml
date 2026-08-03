@@ -81,7 +81,8 @@ jobs:
       - name: Validate shell script
         run: |
           bash -n setup.sh
-          echo "setup.sh: syntax valid on ${{ matrix.os }}"
+          bash -n install.sh
+          echo "shell scripts: syntax valid on ${{ matrix.os }}"
 
       - name: Shell script is executable
         run: test -x setup.sh && echo "executable: yes"
@@ -89,6 +90,6 @@ jobs:
       - name: Validate shell script structure
         run: |
           grep -q "set -euo pipefail" setup.sh || { echo "Missing set -euo pipefail"; exit 1; }
-          grep -q "config_models()" setup.sh || { echo "Missing config_models function"; exit 1; }
-          grep -q "config_providers()" setup.sh || { echo "Missing config_providers function"; exit 1; }
+          grep -q "pi-setup" setup.sh || { echo "setup.sh must wrap pi-setup"; exit 1; }
+          grep -q "pi-setup" install.sh || { echo "install.sh must link pi-setup"; exit 1; }
           echo "Shell script structure: valid"

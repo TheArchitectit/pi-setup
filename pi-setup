@@ -13,6 +13,19 @@ SETTINGS_FILE = os.path.expanduser("~/.pi/agent/settings.json")
 
 BACK = "__BACK__"
 
+def normalize_api_type(api_type: str) -> str:
+    """Map common API type aliases to the values pi-setup's extension uses."""
+    aliases = {
+        "anthropic": "anthropic-messages",
+        "openai": "openai-completions",
+        "openai-chat": "openai-completions",
+    }
+    return aliases.get(api_type.lower(), api_type)
+
+def escape_key(key: str) -> str:
+    """Escape $ as $$ so Pi does not treat it as an env-var reference."""
+    return key.replace("$", "$$")
+
 def ensure(f):
     os.makedirs(os.path.dirname(f), exist_ok=True)
     if not os.path.exists(f):
@@ -169,6 +182,11 @@ def add_or_edit_model(model_id, models):
     if mid == BACK: return BACK
     if not mid: return BACK
 
+    # Prevent duplicate model IDs within this provider
+    if mid != model_id and any(m["id"] == mid for m in models):
+        print(f"  Error: model ID '{mid}' already exists")
+        return BACK
+
     name = ask_back("    Display name", def_name or mid)
     if name == BACK: return BACK
     name = name or mid
@@ -249,8 +267,9 @@ def provider_config(prov_name, existing):
     base_url = ask_back("  Base URL", existing_url or "https://api.example.com/v1")
     if base_url == BACK: return BACK
 
-    api_type = ask_back("  API type (openai-completions, anthropic, gemini)", existing_api)
+    api_type = ask_back("  API type (openai-completions, anthropic-messages, gemini)", existing_api)
     if api_type == BACK: return BACK
+    api_type = normalize_api_type(api_type)
 
     key_ref = ask_back("  Auth key name", existing_keyref)
     if key_ref == BACK: return BACK
@@ -274,8 +293,11 @@ def provider_config(prov_name, existing):
         break
 
     return {
-        "baseUrl": base_url, "api": api_type, "apiKey": key_ref,
+        "baseUrl": base_url,
+        "api": api_type,
+        "apiKey": key_ref,
         "models": models,
+        "compat": { "supportsDeveloperRole": False },
     }, api_key
 
 # ── Main wizard ──────────────────────────────────────
@@ -306,7 +328,7 @@ def main():
             save_atomic(MODELS_FILE, {"providers": provs})
             if api_key:
                 auth = load(AUTH_FILE)
-                auth[prov_data["apiKey"]] = {"type": "api_key", "key": api_key}
+                auth[prov_data["apiKey"]] = {"type": "api_key", "key": escape_key(api_key)}
                 save_atomic(AUTH_FILE, auth)
                 os.chmod(AUTH_FILE, 0o600)
             print(f"\n  {prov_name} saved ({len(prov_data['models'])} models)")
@@ -362,36 +384,24 @@ def main():
                         print(f"  Removed: {sel}")
                         break
 
-    # ── Cleanup: remove providers without valid auth keys ──
+    # ── Warn about missing auth keys, but keep no-key providers (e.g. Ollama) ──
     auth = load(AUTH_FILE)
     provs = get_providers()
-    cleaned = {}
     for pn, pv in provs.items():
         ref = pv.get("apiKey", pn)
         cred = auth.get(ref)
-        if cred and cred.get("type") == "api_key" and cred.get("key", ""):
-            cleaned[pn] = pv
-        else:
-            print(f"  Removed provider '{pn}' (no valid auth key)")
-    if cleaned:
-        d = load(MODELS_FILE)
-        d["providers"] = cleaned
-        d["defaultProvider"] = list(cleaned.keys())[-1]
-        save_atomic(MODELS_FILE, d)
-    auth = {k: v for k, v in auth.items()
-            if any(pv.get("apiKey", pn) == k for pn, pv in cleaned.items())}
-    save_atomic(AUTH_FILE, auth)
-    os.chmod(AUTH_FILE, 0o600)
+        if not (cred and cred.get("type") == "api_key" and cred.get("key", "")):
+            print(f"  Warning: provider '{pn}' has no API key set (local/no-auth endpoints are OK)")
 
     # ── Default model selection ──
     all_models = []
-    for pn, pv in cleaned.items():
+    for pn, pv in provs.items():
         for m in pv.get("models", []):
             all_models.append((pn, m["id"]))
 
+    settings = load(SETTINGS_FILE)
     if all_models:
         print("\n── Default Model ──")
-        settings = load(SETTINGS_FILE)
         current_default = settings.get("defaultModel", "")
         for i, (pn, mid) in enumerate(all_models, 1):
             marker = " *" if mid == current_default else ""
@@ -404,6 +414,13 @@ def main():
             settings["defaultModel"] = mid
             save_atomic(SETTINGS_FILE, settings)
             print(f"  Default model: {mid} ({pn})")
+        elif not settings.get("defaultModel"):
+            # Auto-select first available model so pi can start
+            pn, mid = all_models[0]
+            settings["defaultProvider"] = pn
+            settings["defaultModel"] = mid
+            save_atomic(SETTINGS_FILE, settings)
+            print(f"  Auto-selected default model: {mid} ({pn})")
 
     # ── Settings ──
     print("\n── Settings ──")

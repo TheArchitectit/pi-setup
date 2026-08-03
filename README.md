@@ -6,7 +6,7 @@ Configure providers, models, thinking levels, and defaults through an interactiv
 
 Includes a web dashboard for monitoring your pi configuration at a glance.
 
-> **Status:** v0.1.0 — Dashboard added, API may change between releases.
+> **Status:** v0.1.0 — Dashboard added (Alpha); API may change between releases.
 
 ---
 
@@ -43,7 +43,8 @@ Includes a web dashboard for monitoring your pi configuration at a glance.
 - **Inline "set as default"** — offered immediately after adding a model
 - **Default model selection** — set your preferred model and thinking level
 - **Secure auth storage** — API key references saved with `0600` permissions
-- **Provider cleanup** — providers without valid auth keys are removed on exit
+- **First-run bootstrap** — `pi-setup` standalone wizard creates provider config before `pi` can start (pi exits without a provider); `install.sh` links `pi-setup` onto your `PATH`
+- **No-key providers preserved** — local/Ollama endpoints without an API key are kept, not deleted on exit
 
 ## Dashboard
 
@@ -76,23 +77,28 @@ mkdir -p ~/.pi/agent/extensions
 cp extensions/setup.ts ~/.pi/agent/extensions/
 ```
 
-### Option 2: Clone the Repo
+### Option 2: Clone the Repo + Install Script (recommended)
+
+The install script copies the extension into `~/.pi/agent/extensions/` and symlinks `pi-setup` onto your `PATH`, so the `pi-setup` command works from anywhere.
 
 ```bash
 git clone https://github.com/TheArchitectit/pi-setup.git
 cd pi-setup
-# Then copy the extension:
-cp extensions/setup.ts ~/.pi/agent/extensions/
+./install.sh
+# Then run the standalone wizard from any directory:
+pi-setup
 ```
 
-### Option 3: Shell Script Only
+### Option 3: Manual / Shell Script Only
 
 If you just want the standalone setup wizard (no pi extension):
 
 ```bash
 git clone https://github.com/TheArchitectit/pi-setup.git
 cd pi-setup
-chmod +x setup.sh
+chmod +x pi-setup setup.sh
+./pi-setup
+# or use the bash wrapper:
 ./setup.sh
 ```
 
@@ -136,18 +142,22 @@ The wizard uses pi's built-in dialog system — select lists, text inputs, and c
 Run the standalone wizard without pi installed:
 
 ```bash
+./pi-setup
+# or:
 ./setup.sh
 ```
 
-The shell wizard:
+The standalone wizard:
 
 1. Checks for pi and its config directory
 2. Prompts you to configure providers
-3. Asks for API keys (stored as environment variable references)
+3. Asks for API keys (stored in `~/.pi/agent/auth.json` with `$$`-escaped `$` characters)
 4. Lists and selects available models with full back navigation
 5. Writes the config files that pi reads on startup
 
 Every menu supports `< Back` to return to the previous screen. Text inputs can be cancelled with Enter (empty) to go back.
+
+> **First-run note:** Because `pi` exits when no provider is configured, run `./pi-setup` *before* starting `pi`. Once a provider is saved, `pi` will start and the `/setup` extension will be available for later edits.
 
 ---
 
@@ -320,20 +330,23 @@ Since this is an alpha release, we need your help testing. See [TESTER_NOTES.md]
 # 1. Install the extension
 cp extensions/setup.ts ~/.pi/agent/extensions/
 
-# 2. Start pi
-pi
-
-# 3. Run the setup wizard
-/setup
-
-# 4. Add a provider (e.g., Anthropic)
+# 2. Run the standalone wizard to create an initial provider
+./pi-setup
+#    - Add a provider (e.g., Anthropic)
 #    - Enter base URL: https://api.anthropic.com
 #    - Select API: anthropic-messages
-#    - Set env var: ANTHROPIC_API_KEY
+#    - Enter API key (stored in ~/.pi/agent/auth.json)
 #    - Add models
+#    - Select default model and thinking level
 
-# 5. Verify providers registered
+# 3. Start pi
+pi
+
+# 4. Verify providers registered
 #    The extension should show notifications as providers load
+
+# 5. Test /setup for later edits
+/setup
 
 # 6. Test default model selection
 #    Re-run /setup and select a default model
@@ -346,7 +359,7 @@ pi
 
 | Test Case | Steps | Expected Result |
 |-----------|-------|-----------------|
-| Fresh install | Delete `~/.pi/agent/models.json`, run `/setup` | Wizard starts, creates config |
+| Fresh install | Delete `~/.pi/agent/models.json`, run `./pi-setup` | Wizard creates config before pi starts |
 | Add provider | Menu > Add new provider | Provider saved to models.json |
 | Edit provider | Menu > Edit: anthropic | Existing values shown, saves changes |
 | Edit base URL | Edit provider > Base URL | Input pre-filled with current URL, saves changes |
@@ -360,7 +373,7 @@ pi
 | Auth security | Check `~/.pi/agent/auth.json` permissions | Permissions are `0600` |
 | Duplicate model | Add model with existing ID | Error message, no duplicate created |
 | Missing dir | Delete `~/.pi/agent/`, run setup | Directory structure created |
-| Shell script | Run `./setup.sh` standalone | Config files created correctly |
+| Shell script | Run `./pi-setup` (or `./setup.sh`) standalone | Config files created correctly |
 | Provider persistence | Exit and restart pi, check provider list | Previously saved providers appear |
 | All API types | Add providers for each API type | Correct `api` field values saved |
 
@@ -374,7 +387,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing directions
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+BSD 3-Clause License. See [LICENSE](LICENSE) for details.
 
 ---
 
@@ -383,9 +396,14 @@ MIT License. See [LICENSE](LICENSE) for details.
 - [pi](https://github.com/mariozechner/pi-coding-agent) by Mario Zechner — the coding harness this extends
 - Built with TypeScript and pi's extension API
 
-
 ## ☁️ Cloud Credits
 
 Power your AI projects with [Ozore.com](https://ozore.com/?ref=cwe4kdx0) — use code **lundrog50** for 50% off your first month.
 
 > `direct-pin` and `custom-router` are available on **Pro** and **Max** plans only.
+
+## ☕ Support
+
+If this project helped you, consider buying me a coffee:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-TheArchitectit-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/TheArchitectit)

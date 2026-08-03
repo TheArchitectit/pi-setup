@@ -130,12 +130,15 @@ export default function (pi: ExtensionAPI) {
   const providers = (modelsData.providers ?? {}) as Record<string, ProviderEntry>;
   applyProviders(pi, providers);
 
-  // First-run hint
+  // First-run hint: pi cannot start without a model/provider, so the
+  // standalone wizard must be run before the `/setup` command is usable.
   const hasProviders = Object.keys(providers).length > 0;
   if (!hasProviders) {
     console.log(
       "\nWelcome to pi! No providers configured yet.\n" +
-      "Run /setup to configure your LLM provider and start coding.\n",
+      "Run the standalone setup wizard first:\n" +
+      "  ./pi-setup            (or: python3 pi-setup)\n" +
+      "Then start pi and the `/setup` command will be available.\n",
     );
   }
 
