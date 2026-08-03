@@ -6,7 +6,7 @@ Configure providers, models, thinking levels, and defaults through an interactiv
 
 Includes a web dashboard for monitoring your pi configuration at a glance.
 
-> **Status:** v0.1.0 — Dashboard added (Alpha); API may change between releases.
+> **Status:** v0.2.1 — Dashboard added (Alpha); API may change between releases.
 
 ---
 
@@ -69,17 +69,27 @@ See [dashboard-server/README.md](extensions/dashboard-server/README.md) for arch
 
 ## Installation
 
-### Option 1: Copy the Extension (recommended)
+### Option 1: npm package (recommended)
+
+pi-setup is published to npm as [`pi-setup`](https://www.npmjs.com/package/pi-setup). Install it through pi's package manager so the `/setup` command and `/pi-setup-dashboard` command are registered, and pi's auto-loader picks up the extension:
 
 ```bash
-# Copy the setup extension into your pi extensions directory
-mkdir -p ~/.pi/agent/extensions
-cp extensions/setup.ts ~/.pi/agent/extensions/
+pi install npm:pi-setup
 ```
 
-### Option 2: Clone the Repo + Install Script (recommended)
+Then start (or restart) pi — the extension loads on startup, and `/setup` becomes available immediately.
 
-The install script copies the extension into `~/.pi/agent/extensions/` and symlinks `pi-setup` onto your `PATH`, so the `pi-setup` command works from anywhere.
+**Updating:**
+
+```bash
+pi update --extensions
+```
+
+That's the entire extension install. No cloning, no copying files, no symlinks. The released package includes the pre-built dashboard bundle, so `/pi-setup-dashboard` works out of the box.
+
+### Option 2: Clone the Repo (development / shell-script-only)
+
+Use this if you want to hack on pi-setup, run the standalone wizard without pi, or use the raw shell script. The repository's `install.sh` copies the extension into `~/.pi/agent/extensions/` and symlinks `pi-setup` onto your `PATH` so the `pi-setup` command works from anywhere.
 
 ```bash
 git clone https://github.com/TheArchitectit/pi-setup.git
@@ -89,9 +99,7 @@ cd pi-setup
 pi-setup
 ```
 
-### Option 3: Manual / Shell Script Only
-
-If you just want the standalone setup wizard (no pi extension):
+If you only need the standalone setup wizard (no pi extension):
 
 ```bash
 git clone https://github.com/TheArchitectit/pi-setup.git
@@ -104,9 +112,9 @@ chmod +x pi-setup setup.sh
 
 ### Prerequisites
 
-- **Node.js 18+** (for the extension)
+- **Node.js 18+** (for the extension and the dashboard build)
 - **pi** installed globally (`npm install -g pi` or via [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent))
-- **bash** (for the shell script mode)
+- **bash** (for the shell script mode; not required if you only use Option 1 via npm)
 
 ---
 
@@ -327,10 +335,11 @@ Since this is an alpha release, we need your help testing. See [TESTER_NOTES.md]
 ### Quick Test
 
 ```bash
-# 1. Install the extension
-cp extensions/setup.ts ~/.pi/agent/extensions/
+# 1. Install the extension (npm)
+pi install npm:pi-setup
 
 # 2. Run the standalone wizard to create an initial provider
+#    (clone the repo if you don't have the shell script locally yet)
 ./pi-setup
 #    - Add a provider (e.g., Anthropic)
 #    - Enter base URL: https://api.anthropic.com
