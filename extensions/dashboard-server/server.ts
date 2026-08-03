@@ -37,6 +37,7 @@ import {
 	handleLinks,
 	handleIndex,
 	handleStatic,
+	handleMutation,
 } from "./routes.js";
 import { DASHBOARD_BASE_PORT, DASHBOARD_PORT_RANGE } from "./types.js";
 
@@ -184,7 +185,7 @@ export async function launchDashboardServer(
 				res.setHeader("Access-Control-Allow-Origin", origin);
 				res.setHeader("Vary", "Origin");
 			}
-			res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+			res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 			res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
 			if (req.method === "OPTIONS") {
@@ -198,6 +199,7 @@ export async function launchDashboardServer(
 			if (handleHealth(req, res, ctx)) return;
 			if (await handleSnapshot(req, res, ctx)) return;
 			if (handleLinks(req, res, ctx)) return;
+			if (await handleMutation(req, res, ctx)) return;
 			if (handleIndex(req, res, ctx)) return;
 			handleStatic(req, res, ctx);
 		},

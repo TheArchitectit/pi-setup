@@ -200,6 +200,74 @@ button.ghost:hover {
 	background: hsl(var(--bg-elevated));
 }
 
+/* ─── Forms (provider/model management) ─────────────────────────────── */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+	padding: 0.35rem 0.5rem;
+	border-radius: var(--radius);
+	border: 1px solid hsl(var(--border));
+	background: hsl(var(--bg));
+	color: hsl(var(--foreground));
+	font-family: inherit;
+	font-size: 0.9rem;
+	width: 100%;
+	box-sizing: border-box;
+}
+input:focus, select:focus, textarea:focus {
+	outline: none;
+	border-color: hsl(var(--primary));
+}
+label {
+	display: block;
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: hsl(var(--muted));
+	margin-bottom: 0.15rem;
+	margin-top: 0.4rem;
+}
+.inline-form {
+	display: grid;
+	gap: 0.5rem;
+	padding: 0.75rem;
+	border: 1px solid hsl(var(--border));
+	border-radius: var(--radius);
+	background: hsl(var(--bg-elevated));
+	margin: 0.5rem 0;
+}
+.form-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.75rem;
+}
+.form-actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.25rem;
+}
+.form-actions button {
+	flex: 0 0 auto;
+}
+.field-error {
+	color: hsl(var(--danger));
+	font-size: 0.8rem;
+	margin-top: 0.25rem;
+}
+.danger {
+	color: hsl(var(--danger));
+}
+button.danger {
+	border-color: hsl(var(--danger));
+	color: hsl(var(--danger));
+}
+button.danger:hover {
+	background: hsl(var(--danger));
+	color: hsl(var(--danger-fg));
+}
+
 .cross-link-list {
 	display: flex;
 	gap: 0.5rem;
