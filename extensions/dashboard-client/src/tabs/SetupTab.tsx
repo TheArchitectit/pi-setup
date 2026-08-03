@@ -8,7 +8,12 @@
 import { useState } from "react";
 import type { SetupSnapshot } from "@contracts";
 import { useApi } from "../hooks/useApi";
-import { fetchSnapshot, fetchLinks, setDefaultModel, setThinking } from "../api/client";
+import {
+	fetchSnapshot,
+	fetchLinks,
+	setDefaultModel,
+	setThinking,
+} from "../api/client";
 import { ErrorPanel } from "../components/ErrorPanel";
 
 function Row({
@@ -50,7 +55,9 @@ function DefaultsEditor({
 }): React.ReactElement {
 	const s = snap.settings;
 	const currentDefault = s ? `${s.defaultProvider}/${s.defaultModel}` : "";
-	const [thinking, setThinkingState] = useState(s?.defaultThinkingLevel ?? "high");
+	const [thinking, setThinkingState] = useState(
+		s?.defaultThinkingLevel ?? "high",
+	);
 	const [busy, setBusy] = useState(false);
 	const modelOptions = allModelOptions(snap);
 	const [modelPick, setModelPick] = useState(currentDefault);
@@ -95,53 +102,60 @@ function DefaultsEditor({
 			<h2>Edit defaults</h2>
 			<div className="inline-form">
 				<label>Default model</label>
-			{modelOptions.length === 0 ? (
-				<p className="muted">No models available — add one in the Providers tab.</p>
-			) : (
+				{modelOptions.length === 0 ? (
+					<p className="muted">
+						No models available — add one in the Providers tab.
+					</p>
+				) : (
+					<select
+						value={modelPick}
+						onChange={(e) => setModelPick(e.target.value)}
+					>
+						{!currentDefault && <option value="">— select —</option>}
+						{modelOptions.map((m) => (
+							<option key={m} value={m}>
+								{m}
+								{m === currentDefault ? " ✓" : ""}
+							</option>
+						))}
+					</select>
+				)}
+				<div className="form-actions">
+					<button
+						type="button"
+						className="primary"
+						onClick={submitDefault}
+						disabled={busy || modelOptions.length === 0}
+					>
+						{busy ? "Saving…" : "Set default model"}
+					</button>
+				</div>
+			</div>
+			<div className="inline-form">
+				<label>Thinking level</label>
 				<select
-					value={modelPick}
-					onChange={(e) => setModelPick(e.target.value)}
+					value={thinking}
+					onChange={(e) => setThinkingState(e.target.value)}
 				>
-					{!currentDefault && <option value="">— select —</option>}
-					{modelOptions.map((m) => (
-						<option key={m} value={m}>
-							{m}{m === currentDefault ? " ✓" : ""}
+					{THINKING_LEVELS.map((l) => (
+						<option key={l} value={l}>
+							{l}
+							{l === (s?.defaultThinkingLevel ?? "high") ? " ✓" : ""}
 						</option>
 					))}
 				</select>
-			)}
-			<div className="form-actions">
-				<button
-					type="button"
-					className="primary"
-					onClick={submitDefault}
-					disabled={busy || modelOptions.length === 0}
-				>
-					{busy ? "Saving…" : "Set default model"}
-				</button>
+				<div className="form-actions">
+					<button
+						type="button"
+						className="primary"
+						onClick={submitThinking}
+						disabled={busy}
+					>
+						{busy ? "Saving…" : "Set thinking"}
+					</button>
+				</div>
 			</div>
-		</div>
-		<div className="inline-form">
-			<label>Thinking level</label>
-			<select value={thinking} onChange={(e) => setThinkingState(e.target.value)}>
-				{THINKING_LEVELS.map((l) => (
-					<option key={l} value={l}>
-						{l}{l === (s?.defaultThinkingLevel ?? "high") ? " ✓" : ""}
-					</option>
-				))}
-			</select>
-			<div className="form-actions">
-				<button
-					type="button"
-					className="primary"
-					onClick={submitThinking}
-					disabled={busy}
-				>
-					{busy ? "Saving…" : "Set thinking"}
-				</button>
-			</div>
-		</div>
-	</section>
+		</section>
 	);
 }
 
@@ -150,7 +164,10 @@ export function SetupTab(): React.ReactElement {
 		pollInterval: 10_000,
 	});
 	const [override, setOverride] = useState<SetupSnapshot | null>(null);
-	const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+	const [toast, setToast] = useState<{
+		kind: "ok" | "err";
+		msg: string;
+	} | null>(null);
 	const snap = override ?? data;
 
 	if (loading && !snap) {

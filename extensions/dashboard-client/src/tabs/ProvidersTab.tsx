@@ -56,9 +56,9 @@ function Field({
 }
 
 function FormActions({
- onSave,
- onCancel,
- saveLabel = "Save",
+	onSave,
+	onCancel,
+	saveLabel = "Save",
 }: {
 	onSave: () => void;
 	onCancel: () => void;
@@ -79,8 +79,8 @@ function FormActions({
 // ─── Add Provider form ──────────────────────────────────────────────────────
 
 function AddProviderForm({
- onDone,
- onError,
+	onDone,
+	onError,
 }: {
 	onDone: (snap: SetupSnapshot) => void;
 	onError: (msg: string) => void;
@@ -148,7 +148,11 @@ function AddProviderForm({
 					placeholder="sk-…"
 				/>
 			</Field>
-			<FormActions onSave={submit} onCancel={() => onDone(null!)} saveLabel={busy ? "Saving…" : "Add"} />
+			<FormActions
+				onSave={submit}
+				onCancel={() => onDone(null!)}
+				saveLabel={busy ? "Saving…" : "Add"}
+			/>
 		</div>
 	);
 }
@@ -156,9 +160,9 @@ function AddProviderForm({
 // ─── Edit Provider form ─────────────────────────────────────────────────────
 
 function EditProviderForm({
- provider,
- onDone,
- onError,
+	provider,
+	onDone,
+	onError,
 }: {
 	provider: { name: string; entry: ProviderEntry };
 	onDone: (snap: SetupSnapshot) => void;
@@ -212,7 +216,11 @@ function EditProviderForm({
 					placeholder="sk-…"
 				/>
 			</Field>
-			<FormActions onSave={submit} onCancel={() => onDone(null!)} saveLabel={busy ? "Saving…" : "Save"} />
+			<FormActions
+				onSave={submit}
+				onCancel={() => onDone(null!)}
+				saveLabel={busy ? "Saving…" : "Save"}
+			/>
 		</div>
 	);
 }
@@ -220,9 +228,9 @@ function EditProviderForm({
 // ─── Set API key form ───────────────────────────────────────────────────────
 
 function SetKeyForm({
- providerName,
- onDone,
- onError,
+	providerName,
+	onDone,
+	onError,
 }: {
 	providerName: string;
 	onDone: (snap: SetupSnapshot) => void;
@@ -259,7 +267,11 @@ function SetKeyForm({
 					autoFocus
 				/>
 			</Field>
-			<FormActions onSave={submit} onCancel={() => onDone(null!)} saveLabel={busy ? "Saving…" : "Set key"} />
+			<FormActions
+				onSave={submit}
+				onCancel={() => onDone(null!)}
+				saveLabel={busy ? "Saving…" : "Set key"}
+			/>
 		</div>
 	);
 }
@@ -267,9 +279,9 @@ function SetKeyForm({
 // ─── Add Model form ──────────────────────────────────────────────────────────
 
 function AddModelForm({
- providerName,
- onDone,
- onError,
+	providerName,
+	onDone,
+	onError,
 }: {
 	providerName: string;
 	onDone: (snap: SetupSnapshot) => void;
@@ -302,7 +314,16 @@ function AddModelForm({
 		} finally {
 			setBusy(false);
 		}
-	}, [providerName, id, name, ctxWindow, maxTokens, reasoning, onDone, onError]);
+	}, [
+		providerName,
+		id,
+		name,
+		ctxWindow,
+		maxTokens,
+		reasoning,
+		onDone,
+		onError,
+	]);
 
 	return (
 		<div className="inline-form">
@@ -351,7 +372,11 @@ function AddModelForm({
 					<option value="yes">Yes</option>
 				</select>
 			</Field>
-			<FormActions onSave={submit} onCancel={() => onDone(null!)} saveLabel={busy ? "Saving…" : "Add"} />
+			<FormActions
+				onSave={submit}
+				onCancel={() => onDone(null!)}
+				saveLabel={busy ? "Saving…" : "Add"}
+			/>
 		</div>
 	);
 }
@@ -359,10 +384,10 @@ function AddModelForm({
 // ─── Edit Model form ─────────────────────────────────────────────────────────
 
 function EditModelForm({
- providerName,
- model,
- onDone,
- onError,
+	providerName,
+	model,
+	onDone,
+	onError,
 }: {
 	providerName: string;
 	model: ProviderEntry["models"][number];
@@ -390,7 +415,16 @@ function EditModelForm({
 		} finally {
 			setBusy(false);
 		}
-	}, [providerName, model.id, name, ctxWindow, maxTokens, reasoning, onDone, onError]);
+	}, [
+		providerName,
+		model.id,
+		name,
+		ctxWindow,
+		maxTokens,
+		reasoning,
+		onDone,
+		onError,
+	]);
 
 	return (
 		<div className="inline-form">
@@ -427,7 +461,11 @@ function EditModelForm({
 					<option value="yes">Yes</option>
 				</select>
 			</Field>
-			<FormActions onSave={submit} onCancel={() => onDone(null!)} saveLabel={busy ? "Saving…" : "Save"} />
+			<FormActions
+				onSave={submit}
+				onCancel={() => onDone(null!)}
+				saveLabel={busy ? "Saving…" : "Save"}
+			/>
 		</div>
 	);
 }
@@ -440,12 +478,12 @@ type ModelPanel =
 	| { kind: "edit-model"; modelId: string };
 
 function ModelsTable({
- providerName,
- provider,
- defaultModel,
- onMutate,
- onError,
- onPanelChange,
+	providerName,
+	provider,
+	defaultModel,
+	onMutate,
+	onError,
+	onPanelChange,
 }: {
 	providerName: string;
 	provider: ProviderEntry;
@@ -551,15 +589,22 @@ function ModelsTable({
 											{m.reasoning ? "yes" : "no"}
 										</span>
 									</td>
-									<td className="mono muted">
-										{m.input.join(", ") || "—"}
-									</td>
+									<td className="mono muted">{m.input.join(", ") || "—"}</td>
 									<td>
-										<div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
+										<div
+											style={{
+												display: "flex",
+												gap: "0.25rem",
+												flexWrap: "wrap",
+											}}
+										>
 											{!isDefault && (
 												<button
 													className="ghost"
-													style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+													style={{
+														fontSize: "0.75rem",
+														padding: "0.2rem 0.45rem",
+													}}
 													onClick={() => handleSetDefault(m.id)}
 												>
 													set default
@@ -567,14 +612,22 @@ function ModelsTable({
 											)}
 											<button
 												className="ghost"
-												style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-												onClick={() => setP({ kind: "edit-model", modelId: m.id })}
+												style={{
+													fontSize: "0.75rem",
+													padding: "0.2rem 0.45rem",
+												}}
+												onClick={() =>
+													setP({ kind: "edit-model", modelId: m.id })
+												}
 											>
 												edit
 											</button>
 											<button
 												className="ghost danger"
-												style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+												style={{
+													fontSize: "0.75rem",
+													padding: "0.2rem 0.45rem",
+												}}
 												onClick={() => handleRemoveModel(m.id)}
 											>
 												remove
@@ -609,12 +662,12 @@ type ProviderPanel =
 	| { kind: "set-key" };
 
 function ProviderCard({
- name,
- provider,
- snapshot,
- onMutate,
- onError,
- defaultModel,
+	name,
+	provider,
+	snapshot,
+	onMutate,
+	onError,
+	defaultModel,
 }: {
 	name: string;
 	provider: ProviderEntry;
@@ -690,11 +743,24 @@ function ProviderCard({
 							onError={onError}
 						/>
 					)}
-					<div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", margin: "0.5rem 0" }}>
-						<button className="ghost" onClick={() => setPanel({ kind: "edit" })}>
+					<div
+						style={{
+							display: "flex",
+							gap: "0.5rem",
+							flexWrap: "wrap",
+							margin: "0.5rem 0",
+						}}
+					>
+						<button
+							className="ghost"
+							onClick={() => setPanel({ kind: "edit" })}
+						>
 							Edit provider
 						</button>
-						<button className="ghost" onClick={() => setPanel({ kind: "set-key" })}>
+						<button
+							className="ghost"
+							onClick={() => setPanel({ kind: "set-key" })}
+						>
 							{hasKey ? "Update API key" : "Set API key"}
 						</button>
 						<button className="ghost danger" onClick={handleRemove}>
@@ -731,8 +797,7 @@ export function ProvidersTab(): React.ReactElement {
 	} | null>(null);
 
 	const snapshot = override ?? data;
-	const showError = (msg: string) =>
-		setToast({ kind: "err", msg });
+	const showError = (msg: string) => setToast({ kind: "err", msg });
 	const onMutate = (snap: SetupSnapshot) => {
 		setOverride(snap);
 		setToast({ kind: "ok", msg: "Saved" });
@@ -761,12 +826,16 @@ export function ProvidersTab(): React.ReactElement {
 					{toast.msg}
 				</div>
 			)}
-			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+			<div
+				style={{
+					display: "flex",
+					justifyContent: "space-between",
+					alignItems: "center",
+					marginBottom: "0.75rem",
+				}}
+			>
 				<h2 style={{ margin: 0 }}>Providers ({providers.length})</h2>
-				<button
-					className="primary"
-					onClick={() => setShowAdd(true)}
-				>
+				<button className="primary" onClick={() => setShowAdd(true)}>
 					+ Add provider
 				</button>
 			</div>
@@ -774,8 +843,8 @@ export function ProvidersTab(): React.ReactElement {
 				<div className="card">
 					<AddProviderForm
 						onDone={(snap) => {
-						if (snap) onMutate(snap);
-						setShowAdd(false);
+							if (snap) onMutate(snap);
+							setShowAdd(false);
 						}}
 						onError={showError}
 					/>

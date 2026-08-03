@@ -186,20 +186,20 @@ else
 fi
 RELEASE_NOTES="${RELEASE_NOTES:-(no commit notes extracted)}"
 if command -v gh >/dev/null 2>&1; then
-echo "[deploy] creating GitHub release $TAG on $TRUNK_BRANCH with notes"
-gh release create "$TAG" --target "$TRUNK_BRANCH" \
---title "v$NEW_VERSION" \
---notes "$(printf '## What changed\n\n%s\n\n**Install:** \`pi update --extensions\`' "$RELEASE_NOTES")" \
-2>/dev/null || echo "[deploy] WARN: gh release create failed (gh not authenticated or release exists) — skipping"
+	echo "[deploy] creating GitHub release $TAG on $TRUNK_BRANCH with notes"
+	gh release create "$TAG" --target "$TRUNK_BRANCH" \
+		--title "v$NEW_VERSION" \
+		--notes "$(printf '## What changed\n\n%s\n\n**Install:** \`pi update --extensions\`' "$RELEASE_NOTES")" \
+		2>/dev/null || echo "[deploy] WARN: gh release create failed (gh not authenticated or release exists) — skipping"
 else
-echo "[deploy] WARN: gh CLI not installed — skipping GitHub release creation. Tag $TAG is on $TRUNK_BRANCH."
+	echo "[deploy] WARN: gh CLI not installed — skipping GitHub release creation. Tag $TAG is on $TRUNK_BRANCH."
 fi
 
 # --- 11. restore source branch ----------------------------------------------
 # Return to the branch the deploy was started from so the working tree is left
 # where the user expected it.
 if [[ "$SOURCE_BRANCH" != "$TRUNK_BRANCH" ]]; then
-git checkout "$SOURCE_BRANCH" 2>/dev/null || true
+	git checkout "$SOURCE_BRANCH" 2>/dev/null || true
 fi
 
 # --- 12. post-publish device instructions ------------------------------------

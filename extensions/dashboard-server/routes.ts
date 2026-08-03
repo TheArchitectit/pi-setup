@@ -377,8 +377,7 @@ export async function handleEditProvider(
 		const snapshot: SetupSnapshot = await editProvider(
 			name,
 			{
-				baseUrl:
-					body.baseUrl !== undefined ? String(body.baseUrl) : undefined,
+				baseUrl: body.baseUrl !== undefined ? String(body.baseUrl) : undefined,
 				api: body.api !== undefined ? String(body.api) : undefined,
 				apiKey:
 					body.apiKey !== undefined && body.apiKey !== ""
@@ -471,9 +470,7 @@ export async function handleEditModel(
 						? Number(body.contextWindow)
 						: undefined,
 				maxTokens:
-					body.maxTokens !== undefined
-						? Number(body.maxTokens)
-						: undefined,
+					body.maxTokens !== undefined ? Number(body.maxTokens) : undefined,
 				reasoning:
 					body.reasoning !== undefined ? body.reasoning === true : undefined,
 			},
@@ -522,7 +519,10 @@ export async function handleSetDefaultModel(
 	try {
 		const body = (await readJsonBody(req)) as Record<string, unknown>;
 		const snapshot: SetupSnapshot = await setDefaultModel(
-			{ provider: String(body.provider ?? ""), model: String(body.model ?? "") },
+			{
+				provider: String(body.provider ?? ""),
+				model: String(body.model ?? ""),
+			},
 			ctx.piDir,
 			ctx.serverVersion,
 		);

@@ -112,9 +112,7 @@ function loadProviders(piDir: string): Record<string, ProviderEntry> {
 	return providers;
 }
 
-function normalizeProvider(
-	pv: Record<string, unknown>,
-): ProviderEntry {
+function normalizeProvider(pv: Record<string, unknown>): ProviderEntry {
 	return {
 		baseUrl: String(pv.baseUrl ?? ""),
 		api: String(pv.api ?? ""),
@@ -128,9 +126,7 @@ function normalizeProvider(
 					maxTokens: Number(m.maxTokens ?? 0),
 					reasoning: Boolean(m.reasoning ?? false),
 					input: Array.isArray(m.input) ? (m.input as string[]) : ["text"],
-					compat: m.compat as
-						| { supportsDeveloperRole?: boolean }
-						| undefined,
+					compat: m.compat as { supportsDeveloperRole?: boolean } | undefined,
 				}))
 			: [],
 	};
@@ -153,7 +149,12 @@ function freshSnapshot(
 	return (async () => {
 		const { detectSiblingDashboards } = await import("./snapshot.js");
 		const links: DashboardLink[] = await detectSiblingDashboards();
-		return readSnapshot(join(piDir, "snapshot.json"), serverVersion, links, piDir);
+		return readSnapshot(
+			join(piDir, "snapshot.json"),
+			serverVersion,
+			links,
+			piDir,
+		);
 	})();
 }
 
@@ -176,20 +177,14 @@ const VALID_THINKING_LEVELS = [
 	"xhigh",
 ];
 
-function requireString(
-	value: unknown,
-	field: string,
-): string {
+function requireString(value: unknown, field: string): string {
 	if (typeof value !== "string" || value.length === 0) {
 		throw new ApiMutationError(400, `Missing or invalid "${field}"`);
 	}
 	return value;
 }
 
-function requireNumber(
-	value: unknown,
-	field: string,
-): number {
+function requireNumber(value: unknown, field: string): number {
 	const n = Number(value);
 	if (!Number.isFinite(n) || n <= 0) {
 		throw new ApiMutationError(
@@ -226,10 +221,7 @@ export async function addProvider(
 
 	const providers = loadProviders(piDir);
 	if (name in providers) {
-		throw new ApiMutationError(
-			409,
-			`Provider "${name}" already exists`,
-		);
+		throw new ApiMutationError(409, `Provider "${name}" already exists`);
 	}
 
 	providers[name] = {
@@ -339,10 +331,7 @@ export async function addModel(
 	const providers = loadProviders(piDir);
 	const pv = providers[providerName];
 	if (!pv) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	if (pv.models.some((m) => m.id === id)) {
 		throw new ApiMutationError(
@@ -385,10 +374,7 @@ export async function editModel(
 	const providers = loadProviders(piDir);
 	const pv = providers[providerName];
 	if (!pv) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	const model = pv.models.find((m) => m.id === modelId);
 	if (!model) {
@@ -403,8 +389,7 @@ export async function editModel(
 		model.contextWindow = requireNumber(input.contextWindow, "contextWindow");
 	if (input.maxTokens !== undefined)
 		model.maxTokens = requireNumber(input.maxTokens, "maxTokens");
-	if (input.reasoning !== undefined)
-		model.reasoning = Boolean(input.reasoning);
+	if (input.reasoning !== undefined) model.reasoning = Boolean(input.reasoning);
 
 	saveProviders(piDir, providers);
 	return freshSnapshot(piDir, serverVersion);
@@ -421,10 +406,7 @@ export async function removeModel(
 	const providers = loadProviders(piDir);
 	const pv = providers[providerName];
 	if (!pv) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	const before = pv.models.length;
 	pv.models = pv.models.filter((m) => m.id !== modelId);
@@ -464,10 +446,7 @@ export async function setDefaultModel(
 	const providers = loadProviders(piDir);
 	const pv = providers[providerName];
 	if (!pv) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	if (!pv.models.some((m) => m.id === modelId)) {
 		throw new ApiMutationError(
@@ -513,10 +492,7 @@ export async function setProviderApiKey(
 	requireString(key, "key");
 	const providers = loadProviders(piDir);
 	if (!(providerName in providers)) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	providers[providerName].apiKey = providerName;
 	saveProviders(piDir, providers);
@@ -532,10 +508,7 @@ export async function removeProviderApiKey(
 	requireString(providerName, "provider (url param)");
 	const providers = loadProviders(piDir);
 	if (!(providerName in providers)) {
-		throw new ApiMutationError(
-			404,
-			`Provider "${providerName}" not found`,
-		);
+		throw new ApiMutationError(404, `Provider "${providerName}" not found`);
 	}
 	providers[providerName].apiKey = undefined;
 	saveProviders(piDir, providers);

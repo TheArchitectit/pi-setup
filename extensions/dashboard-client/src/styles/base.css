@@ -216,7 +216,9 @@ textarea {
 	width: 100%;
 	box-sizing: border-box;
 }
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
 	outline: none;
 	border-color: hsl(var(--primary));
 }

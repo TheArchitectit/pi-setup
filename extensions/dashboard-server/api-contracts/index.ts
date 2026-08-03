@@ -129,22 +129,78 @@ export interface SetApiKeyRequest {
  */
 export const ENDPOINTS = {
 	// ── read ──
-	version: { method: "GET" as const, path: "/api/version", description: "Server package version (stale-server detection)." },
-	snapshot: { method: "GET" as const, path: "/api/snapshot", description: "Full config snapshot (providers, settings, auth, links)." },
-	links: { method: "GET" as const, path: "/api/links", description: "Cross-links to sibling pi dashboards." },
-	health: { method: "GET" as const, path: "/api/health", description: "Liveness probe (ok / version / uptime)." },
+	version: {
+		method: "GET" as const,
+		path: "/api/version",
+		description: "Server package version (stale-server detection).",
+	},
+	snapshot: {
+		method: "GET" as const,
+		path: "/api/snapshot",
+		description: "Full config snapshot (providers, settings, auth, links).",
+	},
+	links: {
+		method: "GET" as const,
+		path: "/api/links",
+		description: "Cross-links to sibling pi dashboards.",
+	},
+	health: {
+		method: "GET" as const,
+		path: "/api/health",
+		description: "Liveness probe (ok / version / uptime).",
+	},
 	// ── providers ──
-	addProvider: { method: "POST" as const, path: "/api/providers", description: "Add a new provider." },
-	editProvider: { method: "PUT" as const, path: "/api/providers/:name", description: "Edit an existing provider's baseUrl/api/apiKey." },
-	removeProvider: { method: "DELETE" as const, path: "/api/providers/:name", description: "Remove a provider (and its auth entry)." },
+	addProvider: {
+		method: "POST" as const,
+		path: "/api/providers",
+		description: "Add a new provider.",
+	},
+	editProvider: {
+		method: "PUT" as const,
+		path: "/api/providers/:name",
+		description: "Edit an existing provider's baseUrl/api/apiKey.",
+	},
+	removeProvider: {
+		method: "DELETE" as const,
+		path: "/api/providers/:name",
+		description: "Remove a provider (and its auth entry).",
+	},
 	// ── models ──
-	addModel: { method: "POST" as const, path: "/api/providers/:name/models", description: "Add a model to a provider." },
-	editModel: { method: "PUT" as const, path: "/api/providers/:name/models/:modelId", description: "Edit an existing model." },
-	removeModel: { method: "DELETE" as const, path: "/api/providers/:name/models/:modelId", description: "Remove a model from a provider." },
+	addModel: {
+		method: "POST" as const,
+		path: "/api/providers/:name/models",
+		description: "Add a model to a provider.",
+	},
+	editModel: {
+		method: "PUT" as const,
+		path: "/api/providers/:name/models/:modelId",
+		description: "Edit an existing model.",
+	},
+	removeModel: {
+		method: "DELETE" as const,
+		path: "/api/providers/:name/models/:modelId",
+		description: "Remove a model from a provider.",
+	},
 	// ── settings ──
-	setDefaultModel: { method: "PUT" as const, path: "/api/settings/default-model", description: "Set the default provider + model." },
-	setThinking: { method: "PUT" as const, path: "/api/settings/thinking", description: "Set the default thinking level." },
+	setDefaultModel: {
+		method: "PUT" as const,
+		path: "/api/settings/default-model",
+		description: "Set the default provider + model.",
+	},
+	setThinking: {
+		method: "PUT" as const,
+		path: "/api/settings/thinking",
+		description: "Set the default thinking level.",
+	},
 	// ── auth ──
-	setApiKey: { method: "PUT" as const, path: "/api/auth/:provider", description: "Set a provider's API key (auth.json, chmod 0600)." },
-	removeApiKey: { method: "DELETE" as const, path: "/api/auth/:provider", description: "Remove a provider's API key entry." },
+	setApiKey: {
+		method: "PUT" as const,
+		path: "/api/auth/:provider",
+		description: "Set a provider's API key (auth.json, chmod 0600).",
+	},
+	removeApiKey: {
+		method: "DELETE" as const,
+		path: "/api/auth/:provider",
+		description: "Remove a provider's API key entry.",
+	},
 } as const satisfies Record<string, EndpointDef>;

@@ -91,9 +91,7 @@ export function fetchLinks(): Promise<LinksResponse> {
 const encode = encodeURIComponent;
 
 /** POST /api/providers — add a new provider. */
-export function addProvider(
-	req: AddProviderRequest,
-): Promise<SetupSnapshot> {
+export function addProvider(req: AddProviderRequest): Promise<SetupSnapshot> {
 	return mutateJson<SetupSnapshot>("POST", ENDPOINTS.addProvider.path, req);
 }
 
@@ -167,11 +165,7 @@ export function setApiKey(
 	provider: string,
 	req: SetApiKeyRequest,
 ): Promise<SetupSnapshot> {
-	return mutateJson<SetupSnapshot>(
-		"PUT",
-		`/api/auth/${encode(provider)}`,
-		req,
-	);
+	return mutateJson<SetupSnapshot>("PUT", `/api/auth/${encode(provider)}`, req);
 }
 
 /** DELETE /api/auth/:provider — remove a provider's API key entry. */
