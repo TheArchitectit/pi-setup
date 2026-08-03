@@ -9,44 +9,44 @@
 import React, { type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
-  children: ReactNode;
+	children: ReactNode;
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
+	hasError: boolean;
+	error: Error | null;
 }
 
 export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
+	ErrorBoundaryProps,
+	ErrorBoundaryState
 > {
-  override state: ErrorBoundaryState = { hasError: false, error: null };
+	override state: ErrorBoundaryState = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
+	static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+		return { hasError: true, error };
+	}
 
-  override componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    console.error("[dashboard] render error:", error, info.componentStack);
-  }
+	override componentDidCatch(error: Error, info: React.ErrorInfo): void {
+		console.error("[dashboard] render error:", error, info.componentStack);
+	}
 
-  private handleReload = (): void => {
-    window.location.reload();
-  };
+	private handleReload = (): void => {
+		window.location.reload();
+	};
 
-  override render(): ReactNode {
-    if (this.state.hasError) {
-      return (
-        <div className="error-fallback">
-          <h2>Something went wrong</h2>
-          <p>{this.state.error?.message ?? "Unknown render error"}</p>
-          <button type="button" onClick={this.handleReload}>
-            Reload dashboard
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+	override render(): ReactNode {
+		if (this.state.hasError) {
+			return (
+				<div className="error-fallback">
+					<h2>Something went wrong</h2>
+					<p>{this.state.error?.message ?? "Unknown render error"}</p>
+					<button type="button" onClick={this.handleReload}>
+						Reload dashboard
+					</button>
+				</div>
+			);
+		}
+		return this.props.children;
+	}
 }

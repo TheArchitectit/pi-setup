@@ -48,7 +48,7 @@ Includes a web dashboard for monitoring your pi configuration at a glance.
 
 ## Dashboard
 
-The `/dashboard` command starts a localhost web UI (port 9330) that shows:
+The `/pi-setup-dashboard` command starts a localhost web UI (port 9330) that shows:
 
 - All configured providers with models, context windows, and reasoning support
 - Auth status (key presence, never the keys themselves)
@@ -57,8 +57,8 @@ The `/dashboard` command starts a localhost web UI (port 9330) that shows:
 - Cross-links to sibling dashboards (e.g. pi-mega-compact on port 9320)
 
 ```
-/dashboard        — start/open the dashboard
-/dashboard-stop   — stop the dashboard server
+/pi-setup-dashboard        — start/open the dashboard
+/pi-setup-dashboard-stop   — stop the dashboard server
 ```
 
 The dashboard auto-detects pi-mega-compact's dashboard (if running) and links to it. Both dashboards cross-link each other.

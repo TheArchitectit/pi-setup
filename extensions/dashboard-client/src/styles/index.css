@@ -3,35 +3,35 @@
 @tailwind utilities;
 
 :root {
-  /* Dark theme tokens (default; html has class="dark"). */
-  --bg: 222 47% 6%;
-  --bg-card: 222 30% 10%;
-  --bg-elevated: 222 25% 13%;
-  --border: 215 19% 27%;
-  --foreground: 213 31% 82%;
-  --muted: 215 16% 47%;
-  --muted-fg: 215 20% 65%;
-  --primary: 199 89% 48%;
-  --primary-fg: 222 47% 11%;
-  --primary-glow: 199 89% 60%;
-  --success: 137 63% 40%;
-  --warning: 38 92% 50%;
-  --danger: 0 72% 51%;
-  --accent: 280 65% 60%;
-  --accent-fg: 222 47% 11%;
-  --radius: 0.625rem;
+	/* Dark theme tokens (default; html has class="dark"). */
+	--bg: 222 47% 6%;
+	--bg-card: 222 30% 10%;
+	--bg-elevated: 222 25% 13%;
+	--border: 215 19% 27%;
+	--foreground: 213 31% 82%;
+	--muted: 215 16% 47%;
+	--muted-fg: 215 20% 65%;
+	--primary: 199 89% 48%;
+	--primary-fg: 222 47% 11%;
+	--primary-glow: 199 89% 60%;
+	--success: 137 63% 40%;
+	--warning: 38 92% 50%;
+	--danger: 0 72% 51%;
+	--accent: 280 65% 60%;
+	--accent-fg: 222 47% 11%;
+	--radius: 0.625rem;
 }
 
 html,
 body,
 #root {
-  height: 100%;
+	height: 100%;
 }
 
 body {
-  margin: 0;
-  background: hsl(var(--bg));
-  color: hsl(var(--foreground));
-  font-family: theme("fontFamily.sans");
-  -webkit-font-smoothing: antialiased;
+	margin: 0;
+	background: hsl(var(--bg));
+	color: hsl(var(--foreground));
+	font-family: theme("fontFamily.sans");
+	-webkit-font-smoothing: antialiased;
 }

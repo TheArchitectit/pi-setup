@@ -12,11 +12,11 @@ import "./styles/base.css";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
-  throw new Error("dashboard-client: #root element not found in index.html");
+	throw new Error("dashboard-client: #root element not found in index.html");
 }
 
 createRoot(rootEl).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+	<StrictMode>
+		<App />
+	</StrictMode>,
 );

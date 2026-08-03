@@ -5,8 +5,17 @@
  * thinking level, and default model selection using pi's built-in UI.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import {
+	readFileSync,
+	writeFileSync,
+	mkdirSync,
+	chmodSync,
+	existsSync,
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, execSync } from "node:child_process";
@@ -17,450 +26,520 @@ const AUTH_FILE = join(PI_DIR, "auth.json");
 const SETTINGS_FILE = join(PI_DIR, "settings.json");
 
 function loadJson(path: string): Record<string, unknown> {
-  try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
+	try {
+		return JSON.parse(readFileSync(path, "utf-8"));
+	} catch {
+		return {};
+	}
 }
 
 function saveJson(path: string, data: Record<string, unknown>) {
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2));
-  if (path === AUTH_FILE) chmodSync(path, 0o600);
+	mkdirSync(join(path, ".."), { recursive: true });
+	writeFileSync(path, JSON.stringify(data, null, 2));
+	if (path === AUTH_FILE) chmodSync(path, 0o600);
 }
 
 type ProviderEntry = {
-  baseUrl: string;
-  api: string;
-  apiKey?: string;
-  compat?: { supportsDeveloperRole?: boolean };
-  models: Array<{
-    id: string;
-    name: string;
-    contextWindow: number;
-    maxTokens: number;
-    reasoning: boolean;
-    input: string[];
-    compat?: { supportsDeveloperRole?: boolean };
-  }>;
+	baseUrl: string;
+	api: string;
+	apiKey?: string;
+	compat?: { supportsDeveloperRole?: boolean };
+	models: Array<{
+		id: string;
+		name: string;
+		contextWindow: number;
+		maxTokens: number;
+		reasoning: boolean;
+		input: string[];
+		compat?: { supportsDeveloperRole?: boolean };
+	}>;
 };
 
 function getAllModels(providers: Record<string, ProviderEntry>) {
-  const result: Array<{ provider: string; id: string }> = [];
-  for (const [pn, pv] of Object.entries(providers)) {
-    for (const m of pv.models ?? []) {
-      result.push({ provider: pn, id: m.id });
-    }
-  }
-  return result;
+	const result: Array<{ provider: string; id: string }> = [];
+	for (const [pn, pv] of Object.entries(providers)) {
+		for (const m of pv.models ?? []) {
+			result.push({ provider: pn, id: m.id });
+		}
+	}
+	return result;
 }
 
 function ensureAuthKeysEscaped() {
-  const authData = loadJson(AUTH_FILE);
-  let dirty = false;
+	const authData = loadJson(AUTH_FILE);
+	let dirty = false;
 
-  for (const [, entry] of Object.entries(authData)) {
-    const cred = entry as { type?: string; key?: string };
-    if (cred?.type !== "api_key" || !cred.key) continue;
-    // Re-escape: undo any existing $$ → $, then escape all $ → $$.
-    // This fixes keys that were saved before the escaping fix, while
-    // leaving already-correct keys unchanged.
-    const unescaped = cred.key.replace(/\$\$/g, "$");
-    // Arrow function is required: String.replace treats $$ in a string
-    // replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
-    const reEscaped = unescaped.replace(/\$/g, () => "$$");
-    if (reEscaped !== cred.key) {
-      cred.key = reEscaped;
-      dirty = true;
-    }
-  }
+	for (const [, entry] of Object.entries(authData)) {
+		const cred = entry as { type?: string; key?: string };
+		if (cred?.type !== "api_key" || !cred.key) continue;
+		// Re-escape: undo any existing $$ → $, then escape all $ → $$.
+		// This fixes keys that were saved before the escaping fix, while
+		// leaving already-correct keys unchanged.
+		const unescaped = cred.key.replace(/\$\$/g, "$");
+		// Arrow function is required: String.replace treats $$ in a string
+		// replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
+		const reEscaped = unescaped.replace(/\$/g, () => "$$");
+		if (reEscaped !== cred.key) {
+			cred.key = reEscaped;
+			dirty = true;
+		}
+	}
 
-  if (dirty) saveJson(AUTH_FILE, authData);
+	if (dirty) saveJson(AUTH_FILE, authData);
 }
 
-function applyProviders(pi: ExtensionAPI, providers: Record<string, ProviderEntry>) {
-  const authData = loadJson(AUTH_FILE);
+function applyProviders(
+	pi: ExtensionAPI,
+	providers: Record<string, ProviderEntry>,
+) {
+	const authData = loadJson(AUTH_FILE);
 
-  for (const [name, pv] of Object.entries(providers)) {
-    if (!pv.baseUrl || pv.models.length === 0) continue;
+	for (const [name, pv] of Object.entries(providers)) {
+		if (!pv.baseUrl || pv.models.length === 0) continue;
 
-    // Provider-level compat from models.json; model-level compat overrides.
-    // Custom OpenAI-compatible endpoints are rarely first-party OpenAI, and
-    // many (GLM, Qwen, etc.) reject the "developer" role with a 400.  pi-ai's
-    // auto-detection defaults supportsDeveloperRole to true for non-standard
-    // custom providers, so we force it false unless the provider explicitly
-    // opts in.  Provider-level > model-level precedence is preserved by the
-    // spread order below.
-    const providerCompat = { supportsDeveloperRole: false, ...(pv.compat ?? {}) };
+		// Provider-level compat from models.json; model-level compat overrides.
+		// Custom OpenAI-compatible endpoints are rarely first-party OpenAI, and
+		// many (GLM, Qwen, etc.) reject the "developer" role with a 400.  pi-ai's
+		// auto-detection defaults supportsDeveloperRole to true for non-standard
+		// custom providers, so we force it false unless the provider explicitly
+		// opts in.  Provider-level > model-level precedence is preserved by the
+		// spread order below.
+		const providerCompat = {
+			supportsDeveloperRole: false,
+			...(pv.compat ?? {}),
+		};
 
-    // Read the actual API key from auth.json so registerProvider
-    // gets the resolved key, not a provider name or env var reference.
-    // Keys in auth.json are already $$-escaped by saveAuth; Pi's
-    // resolveConfigValue resolves $$ back to a literal $.
-    const authEntry = authData[name] as { type?: string; key?: string } | undefined;
-    const resolvedKey = authEntry?.type === "api_key" && authEntry.key ? authEntry.key : pv.apiKey ?? name;
+		// Read the actual API key from auth.json so registerProvider
+		// gets the resolved key, not a provider name or env var reference.
+		// Keys in auth.json are already $$-escaped by saveAuth; Pi's
+		// resolveConfigValue resolves $$ back to a literal $.
+		const authEntry = authData[name] as
+			| { type?: string; key?: string }
+			| undefined;
+		const resolvedKey =
+			authEntry?.type === "api_key" && authEntry.key
+				? authEntry.key
+				: (pv.apiKey ?? name);
 
-    pi.registerProvider(name, {
-      baseUrl: pv.baseUrl,
-      apiKey: resolvedKey,
-      api: pv.api as any,
-      models: pv.models.map((m) => ({
-        id: m.id,
-        name: m.name || m.id,
-        reasoning: m.reasoning,
-        input: m.input as ("text" | "image")[],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: m.contextWindow,
-        maxTokens: m.maxTokens,
-        compat: { ...providerCompat, ...m.compat },
-      })),
-    });
-  }
+		pi.registerProvider(name, {
+			baseUrl: pv.baseUrl,
+			apiKey: resolvedKey,
+			api: pv.api as any,
+			models: pv.models.map((m) => ({
+				id: m.id,
+				name: m.name || m.id,
+				reasoning: m.reasoning,
+				input: m.input as ("text" | "image")[],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: m.contextWindow,
+				maxTokens: m.maxTokens,
+				compat: { ...providerCompat, ...m.compat },
+			})),
+		});
+	}
 }
 
 export default function (pi: ExtensionAPI) {
-  // Fix any unescaped $ in auth.json before Pi's AuthStorage resolves them.
-  // Keys containing $VAR are misinterpreted as env-var references; $$
-  // is the escape sequence for a literal $.
-  ensureAuthKeysEscaped();
+	// Fix any unescaped $ in auth.json before Pi's AuthStorage resolves them.
+	// Keys containing $VAR are misinterpreted as env-var references; $$
+	// is the escape sequence for a literal $.
+	ensureAuthKeysEscaped();
 
-  // Auto-register providers from saved config on startup
-  const modelsData = loadJson(MODELS_FILE);
-  const providers = (modelsData.providers ?? {}) as Record<string, ProviderEntry>;
-  applyProviders(pi, providers);
+	// Auto-register providers from saved config on startup
+	const modelsData = loadJson(MODELS_FILE);
+	const providers = (modelsData.providers ?? {}) as Record<
+		string,
+		ProviderEntry
+	>;
+	applyProviders(pi, providers);
 
-  // First-run hint: pi cannot start without a model/provider, so the
-  // standalone wizard must be run before the `/setup` command is usable.
-  const hasProviders = Object.keys(providers).length > 0;
-  if (!hasProviders) {
-    console.log(
-      "\nWelcome to pi! No providers configured yet.\n" +
-      "Run the standalone setup wizard first:\n" +
-      "  ./pi-setup            (or: python3 pi-setup)\n" +
-      "Then start pi and the `/setup` command will be available.\n",
-    );
-  }
+	// First-run hint: pi cannot start without a model/provider, so the
+	// standalone wizard must be run before the `/setup` command is usable.
+	const hasProviders = Object.keys(providers).length > 0;
+	if (!hasProviders) {
+		console.log(
+			"\nWelcome to pi! No providers configured yet.\n" +
+				"Run the standalone setup wizard first:\n" +
+				"  ./pi-setup            (or: python3 pi-setup)\n" +
+				"Then start pi and the `/setup` command will be available.\n",
+		);
+	}
 
-  pi.registerCommand("setup", {
-    description: "Configure providers, models, thinking level, and defaults",
-    handler: async (_args, ctx) => {
-      const ui = ctx.ui;
-      const modelsData = loadJson(MODELS_FILE);
-      const providers = (modelsData.providers ?? {}) as Record<string, ProviderEntry>;
+	pi.registerCommand("setup", {
+		description: "Configure providers, models, thinking level, and defaults",
+		handler: async (_args, ctx) => {
+			const ui = ctx.ui;
+			const modelsData = loadJson(MODELS_FILE);
+			const providers = (modelsData.providers ?? {}) as Record<
+				string,
+				ProviderEntry
+			>;
 
-      // ── Main wizard flow ──
-      let step: "providers" | "model" | "thinking" | "" = "providers";
+			// ── Main wizard flow ──
+			let step: "providers" | "model" | "thinking" | "" = "providers";
 
-      while (step) {
-        if (step === "providers") {
-          const providerNames = Object.keys(providers);
-          const choices = [
-            "+ Add new provider",
-            ...providerNames.map((n) => `Edit: ${n}`),
-            "--- Done ---",
-          ];
+			while (step) {
+				if (step === "providers") {
+					const providerNames = Object.keys(providers);
+					const choices = [
+						"+ Add new provider",
+						...providerNames.map((n) => `Edit: ${n}`),
+						"--- Done ---",
+					];
 
-          const pick = await ui.select("Providers:", choices);
-          if (!pick) { step = ""; break; }
-          if (pick === "--- Done ---") { step = "model"; continue; }
+					const pick = await ui.select("Providers:", choices);
+					if (!pick) {
+						step = "";
+						break;
+					}
+					if (pick === "--- Done ---") {
+						step = "model";
+						continue;
+					}
 
-          if (pick === "+ Add new provider") {
-            const back = await addProvider(ui, providers);
-            if (back === "back") continue;
-          } else {
-            const name = pick.replace(/^Edit: /, "");
-            const back = await editProvider(ui, name, providers);
-            if (back === "back") continue;
-          }
-          // Stay on providers after add/edit
-          continue;
-        }
+					if (pick === "+ Add new provider") {
+						const back = await addProvider(ui, providers);
+						if (back === "back") continue;
+					} else {
+						const name = pick.replace(/^Edit: /, "");
+						const back = await editProvider(ui, name, providers);
+						if (back === "back") continue;
+					}
+					// Stay on providers after add/edit
+					continue;
+				}
 
-        if (step === "model") {
-          const allModels = getAllModels(providers);
-          if (allModels.length === 0) { step = "thinking"; continue; }
+				if (step === "model") {
+					const allModels = getAllModels(providers);
+					if (allModels.length === 0) {
+						step = "thinking";
+						continue;
+					}
 
-          const settings = loadJson(SETTINGS_FILE);
-          const currentDefault = (settings.defaultModel as string) ?? "";
+					const settings = loadJson(SETTINGS_FILE);
+					const currentDefault = (settings.defaultModel as string) ?? "";
 
-          const choices = [
-            ...allModels.map((m) =>
-              `${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}`,
-            ),
-            "< Back to providers",
-            "--- Done ---",
-          ];
+					const choices = [
+						...allModels.map(
+							(m) =>
+								`${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}`,
+						),
+						"< Back to providers",
+						"--- Done ---",
+					];
 
-          const picked = await ui.select("Set default model:", choices);
-          if (!picked) { step = "providers"; continue; }
-          if (picked === "< Back to providers") { step = "providers"; continue; }
-          if (picked === "--- Done ---") { step = "thinking"; continue; }
+					const picked = await ui.select("Set default model:", choices);
+					if (!picked) {
+						step = "providers";
+						continue;
+					}
+					if (picked === "< Back to providers") {
+						step = "providers";
+						continue;
+					}
+					if (picked === "--- Done ---") {
+						step = "thinking";
+						continue;
+					}
 
-          const match = allModels.find(
-            (m) => `${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}` === picked,
-          );
-          if (match) {
-            settings.defaultProvider = match.provider;
-            settings.defaultModel = match.id;
-            saveJson(SETTINGS_FILE, settings);
-            ui.notify(`Default model: ${match.id}`, "info");
-          }
-          step = "thinking";
-          continue;
-        }
+					const match = allModels.find(
+						(m) =>
+							`${m.id} (${m.provider})${m.id === currentDefault ? " *" : ""}` ===
+							picked,
+					);
+					if (match) {
+						settings.defaultProvider = match.provider;
+						settings.defaultModel = match.id;
+						saveJson(SETTINGS_FILE, settings);
+						ui.notify(`Default model: ${match.id}`, "info");
+					}
+					step = "thinking";
+					continue;
+				}
 
-        if (step === "thinking") {
-          const settings = loadJson(SETTINGS_FILE);
-          const currentThinking = (settings.defaultThinkingLevel as string) ?? "high";
-          const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
-          const choices = [
-            ...levels.map((l) => `${l}${l === currentThinking ? " *" : ""}`),
-            "< Back to model",
-            "--- Done ---",
-          ];
-          const thinkingPick = await ui.select("Default thinking level:", choices);
-          if (!thinkingPick) { step = "model"; continue; }
-          if (thinkingPick === "--- Done ---") { step = ""; break; }
-          if (thinkingPick === "< Back to model") { step = "model"; continue; }
+				if (step === "thinking") {
+					const settings = loadJson(SETTINGS_FILE);
+					const currentThinking =
+						(settings.defaultThinkingLevel as string) ?? "high";
+					const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
+					const choices = [
+						...levels.map((l) => `${l}${l === currentThinking ? " *" : ""}`),
+						"< Back to model",
+						"--- Done ---",
+					];
+					const thinkingPick = await ui.select(
+						"Default thinking level:",
+						choices,
+					);
+					if (!thinkingPick) {
+						step = "model";
+						continue;
+					}
+					if (thinkingPick === "--- Done ---") {
+						step = "";
+						break;
+					}
+					if (thinkingPick === "< Back to model") {
+						step = "model";
+						continue;
+					}
 
-          const level = thinkingPick.replace(/ \*$/, "") as string;
-          settings.defaultThinkingLevel = level;
-          saveJson(SETTINGS_FILE, settings);
-          ui.notify(`Thinking level: ${level}`, "info");
-          step = ""; break;
-        }
-      }
+					const level = thinkingPick.replace(/ \*$/, "") as string;
+					settings.defaultThinkingLevel = level;
+					saveJson(SETTINGS_FILE, settings);
+					ui.notify(`Thinking level: ${level}`, "info");
+					step = "";
+					break;
+				}
+			}
 
-      // ── Apply providers to current session ──
-      applyProviders(pi, providers);
-      if (step === "") ui.notify("Setup complete", "info");
-    },
-  });
+			// ── Apply providers to current session ──
+			applyProviders(pi, providers);
+			if (step === "") ui.notify("Setup complete", "info");
+		},
+	});
 
-  // ── /dashboard command ──────────────────────────────────────────────────
-  // Spawns a localhost web dashboard (port 9330–9339) showing provider/model
-  // config, auth status, installed packages, and cross-links to sibling
-  // dashboards (e.g. pi-mega-compact on port 9320).
-  const DASH_BASE = 9330;
-  const stateDir = join(PI_DIR, "extensions", "pi-setup-dashboard");
-  const portFile = join(stateDir, "port.pid");
-  const runnerFile = join(stateDir, "_dashboard-runner.mjs");
+	// ── /pi-setup-dashboard command ─────────────────────────────────────────
+	// Spawns a localhost web dashboard (port 9330–9339) showing provider/model
+	// config, auth status, installed packages, and cross-links to sibling
+	// dashboards (e.g. pi-mega-compact on port 9320). Named with a `pi-setup-`
+	// prefix to avoid colliding with pi-mega-compact's `/mega-dashboard`.
+	const DASH_BASE = 9330;
+	const stateDir = join(PI_DIR, "extensions", "pi-setup-dashboard");
+	const portFile = join(stateDir, "port.pid");
+	const runnerFile = join(stateDir, "_dashboard-runner.mjs");
 
-  async function findLiveDashboardPort(): Promise<number | null> {
-    for (let port = DASH_BASE; port <= DASH_BASE + 9; port++) {
-      try {
-        const res = await fetch(`http://localhost:${port}/api/version`, {
-          signal: AbortSignal.timeout(800),
-        });
-        if (res.ok) return port;
-      } catch {
-        /* not on this port */
-      }
-    }
-    return null;
-  }
+	async function findLiveDashboardPort(): Promise<number | null> {
+		for (let port = DASH_BASE; port <= DASH_BASE + 9; port++) {
+			try {
+				const res = await fetch(`http://localhost:${port}/api/version`, {
+					signal: AbortSignal.timeout(800),
+				});
+				if (res.ok) return port;
+			} catch {
+				/* not on this port */
+			}
+		}
+		return null;
+	}
 
-  pi.registerCommand("dashboard", {
-    description: "Open the pi-setup web dashboard (localhost:9330)",
-    handler: async (_args, ctx) => {
-      // Check for existing live server
-      const existingPort = await findLiveDashboardPort();
-      if (existingPort) {
-        const url = `http://localhost:${existingPort}`;
-        ctx.ui.notify(`Dashboard already running: ${url}`, "info");
-        try {
-          execSync(`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`);
-        } catch {
-          /* non-fatal */
-        }
-        return;
-      }
+	pi.registerCommand("pi-setup-dashboard", {
+		description: "Open the pi-setup web dashboard (localhost:9330)",
+		handler: async (_args, ctx) => {
+			// Check for existing live server
+			const existingPort = await findLiveDashboardPort();
+			if (existingPort) {
+				const url = `http://localhost:${existingPort}`;
+				ctx.ui.notify(`Dashboard already running: ${url}`, "info");
+				try {
+					execSync(
+						`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`,
+					);
+				} catch {
+					/* non-fatal */
+				}
+				return;
+			}
 
-      // Spawn the dashboard server
-      try {
-        mkdirSync(stateDir, { recursive: true });
+			// Spawn the dashboard server
+			try {
+				mkdirSync(stateDir, { recursive: true });
 
-        // Resolve the dashboard-server entry point
-        const here = dirname(fileURLToPath(import.meta.url));
-        const candidates = [
-          join(here, "dashboard-server", "server.ts"),
-          join(here, "..", "dist", "extensions", "dashboard-server", "server.js"),
-          join(here, "dashboard-server", "server.js"),
-        ];
-        const entry = candidates.find((p) => existsSync(p));
-        if (!entry) {
-          ctx.ui.notify("Dashboard server module not found", "error");
-          return;
-        }
+				// Resolve the dashboard-server entry point
+				const here = dirname(fileURLToPath(import.meta.url));
+				const candidates = [
+					join(here, "dashboard-server", "server.ts"),
+					join(
+						here,
+						"..",
+						"dist",
+						"extensions",
+						"dashboard-server",
+						"server.js",
+					),
+					join(here, "dashboard-server", "server.js"),
+				];
+				const entry = candidates.find((p) => existsSync(p));
+				if (!entry) {
+					ctx.ui.notify("Dashboard server module not found", "error");
+					return;
+				}
 
-        // Write a runner that imports the entry point
-        const runner = `import { launchDashboardServer } from "${entry.replace(/\.ts$/, ".js")}";\nlaunchDashboardServer("${stateDir}").catch((e) => { console.error(e); process.exit(1); });\n`;
-        writeFileSync(runnerFile, runner);
+				// Write a runner that imports the entry point
+				const runner = `import { launchDashboardServer } from "${entry.replace(/\.ts$/, ".js")}";\nlaunchDashboardServer("${stateDir}").catch((e) => { console.error(e); process.exit(1); });\n`;
+				writeFileSync(runnerFile, runner);
 
-        const child = spawn(process.execPath, ["--experimental-strip-types", runnerFile, stateDir], {
-          stdio: "ignore",
-          detached: true,
-          env: { ...process.env, PI_SETUP_DASHBOARD_PORT: String(DASH_BASE) },
-        });
+				const child = spawn(
+					process.execPath,
+					["--experimental-strip-types", runnerFile, stateDir],
+					{
+						stdio: "ignore",
+						detached: true,
+						env: { ...process.env, PI_SETUP_DASHBOARD_PORT: String(DASH_BASE) },
+					},
+				);
 
-        child.unref();
+				child.unref();
 
-        // Wait briefly for the server to start
-        let port: number | null = null;
-        for (let i = 0; i < 10; i++) {
-          await new Promise((r) => setTimeout(r, 300));
-          port = await findLiveDashboardPort();
-          if (port) break;
-        }
+				// Wait briefly for the server to start
+				let port: number | null = null;
+				for (let i = 0; i < 10; i++) {
+					await new Promise((r) => setTimeout(r, 300));
+					port = await findLiveDashboardPort();
+					if (port) break;
+				}
 
-        if (port) {
-          const url = `http://localhost:${port}`;
-          ctx.ui.notify(`Dashboard running: ${url}`, "info");
-          try {
-            execSync(`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`);
-          } catch {
-            /* non-fatal */
-          }
-        } else {
-          ctx.ui.notify("Dashboard failed to start — check logs", "error");
-        }
-      } catch (err) {
-        ctx.ui.notify(`Dashboard error: ${String(err)}`, "error");
-      }
-    },
-  });
+				if (port) {
+					const url = `http://localhost:${port}`;
+					ctx.ui.notify(`Dashboard running: ${url}`, "info");
+					try {
+						execSync(
+							`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`,
+						);
+					} catch {
+						/* non-fatal */
+					}
+				} else {
+					ctx.ui.notify("Dashboard failed to start — check logs", "error");
+				}
+			} catch (err) {
+				ctx.ui.notify(`Dashboard error: ${String(err)}`, "error");
+			}
+		},
+	});
 
-  pi.registerCommand("dashboard-stop", {
-    description: "Stop the pi-setup web dashboard",
-    handler: async (_args, ctx) => {
-      const port = await findLiveDashboardPort();
-      if (!port) {
-        ctx.ui.notify("Dashboard not running", "info");
-        return;
-      }
-      try {
-        // Read PID from port file or kill by port
-        if (existsSync(portFile)) {
-          const info = JSON.parse(readFileSync(portFile, "utf-8"));
-          if (info.pid) {
-            process.kill(info.pid, "SIGTERM");
-          }
-        } else {
-          // Fallback: find PID by port
-          try {
-            const out = execSync(`ss -ltnp 2>/dev/null | grep ':${port} '`, { encoding: "utf-8" });
-            const m = out.match(/pid=(\d+)/);
-            if (m) process.kill(Number(m[1]), "SIGTERM");
-          } catch {
-            /* ss not available */
-          }
-        }
-        ctx.ui.notify("Dashboard stopped", "info");
-      } catch (err) {
-        ctx.ui.notify(`Failed to stop: ${String(err)}`, "error");
-      }
-    },
-  });
+	pi.registerCommand("pi-setup-dashboard-stop", {
+		description: "Stop the pi-setup web dashboard",
+		handler: async (_args, ctx) => {
+			const port = await findLiveDashboardPort();
+			if (!port) {
+				ctx.ui.notify("Dashboard not running", "info");
+				return;
+			}
+			try {
+				// Read PID from port file or kill by port
+				if (existsSync(portFile)) {
+					const info = JSON.parse(readFileSync(portFile, "utf-8"));
+					if (info.pid) {
+						process.kill(info.pid, "SIGTERM");
+					}
+				} else {
+					// Fallback: find PID by port
+					try {
+						const out = execSync(`ss -ltnp 2>/dev/null | grep ':${port} '`, {
+							encoding: "utf-8",
+						});
+						const m = out.match(/pid=(\d+)/);
+						if (m) process.kill(Number(m[1]), "SIGTERM");
+					} catch {
+						/* ss not available */
+					}
+				}
+				ctx.ui.notify("Dashboard stopped", "info");
+			} catch (err) {
+				ctx.ui.notify(`Failed to stop: ${String(err)}`, "error");
+			}
+		},
+	});
 }
 
 /**
  * Returns "back" if the user wants to go back, or void if done.
  */
 async function addProvider(
-  ui: ExtensionContext["ui"],
-  providers: Record<string, ProviderEntry>,
+	ui: ExtensionContext["ui"],
+	providers: Record<string, ProviderEntry>,
 ): Promise<"back" | void> {
-  const name = await ui.input("Provider name:", "my-provider");
-  if (!name) return "back";
+	const name = await ui.input("Provider name:", "my-provider");
+	if (!name) return "back";
 
-  const baseUrl = await ui.input("Base URL:", "http://localhost:8001/v1");
-  if (!baseUrl) return "back";
+	const baseUrl = await ui.input("Base URL:", "http://localhost:8001/v1");
+	if (!baseUrl) return "back";
 
-  const apiPick = await ui.select("API type:", [
-    "openai-completions",
-    "anthropic-messages",
-    "gemini",
-  ]);
-  if (!apiPick) return "back";
+	const apiPick = await ui.select("API type:", [
+		"openai-completions",
+		"anthropic-messages",
+		"gemini",
+	]);
+	if (!apiPick) return "back";
 
-  const keyInput = await ui.input("API key:", "");
+	const keyInput = await ui.input("API key:", "");
 
-  const provider: ProviderEntry = {
-    baseUrl,
-    api: apiPick,
-    apiKey: name,
-    models: [],
-    compat: { supportsDeveloperRole: false },
-  };
+	const provider: ProviderEntry = {
+		baseUrl,
+		api: apiPick,
+		apiKey: name,
+		models: [],
+		compat: { supportsDeveloperRole: false },
+	};
 
-  await modelsLoop(ui, provider, providers);
+	await modelsLoop(ui, provider, providers);
 
-  providers[name] = provider;
-  saveModels(providers);
-  if (keyInput) saveAuth(name, keyInput);
-  ui.notify(`Provider "${name}" saved`, "info");
+	providers[name] = provider;
+	saveModels(providers);
+	if (keyInput) saveAuth(name, keyInput);
+	ui.notify(`Provider "${name}" saved`, "info");
 }
 
 /**
  * Returns "back" if the user wants to go back, or void if done.
  */
 async function editProvider(
-  ui: ExtensionContext["ui"],
-  name: string,
-  providers: Record<string, ProviderEntry>,
+	ui: ExtensionContext["ui"],
+	name: string,
+	providers: Record<string, ProviderEntry>,
 ): Promise<"back" | void> {
-  const backToProvider = true;
-  while (backToProvider) {
-    const pv = providers[name];
-    const action = await ui.select(`Edit "${name}":`, [
-      "Base URL",
-      "API type",
-      "API key",
-      "Manage models",
-      "Remove provider",
-      "< Back",
-    ]);
+	const backToProvider = true;
+	while (backToProvider) {
+		const pv = providers[name];
+		const action = await ui.select(`Edit "${name}":`, [
+			"Base URL",
+			"API type",
+			"API key",
+			"Manage models",
+			"Remove provider",
+			"< Back",
+		]);
 
-    if (!action || action === "< Back") return "back";
+		if (!action || action === "< Back") return "back";
 
-    if (action === "Base URL") {
-      const url = await ui.input("Base URL:", pv.baseUrl);
-      if (url) {
-        pv.baseUrl = url;
-        saveModels(providers);
-        ui.notify(`Base URL updated`, "info");
-      }
-    } else if (action === "API type") {
-      const api = await ui.select("API type:", [
-        "openai-completions",
-        "anthropic-messages",
-        "gemini",
-      ]);
-      if (api) {
-        pv.api = api;
-        saveModels(providers);
-        ui.notify(`API type updated: ${api}`, "info");
-      }
-    } else if (action === "API key") {
-      const key = await ui.input("API key:", "");
-      if (key !== undefined && key !== "") {
-        pv.apiKey = name;
-        saveModels(providers);
-        saveAuth(name, key);
-        ui.notify(`API key updated`, "info");
-      }
-    } else if (action === "Manage models") {
-      await modelsLoop(ui, pv, providers);
-      saveModels(providers);
-      ui.notify(`Models updated for "${name}"`, "info");
-    } else if (action === "Remove provider") {
-      delete providers[name];
-      saveModels(providers);
-      ui.notify(`Provider "${name}" removed`, "info");
-      return;
-    }
-  }
+		if (action === "Base URL") {
+			const url = await ui.input("Base URL:", pv.baseUrl);
+			if (url) {
+				pv.baseUrl = url;
+				saveModels(providers);
+				ui.notify(`Base URL updated`, "info");
+			}
+		} else if (action === "API type") {
+			const api = await ui.select("API type:", [
+				"openai-completions",
+				"anthropic-messages",
+				"gemini",
+			]);
+			if (api) {
+				pv.api = api;
+				saveModels(providers);
+				ui.notify(`API type updated: ${api}`, "info");
+			}
+		} else if (action === "API key") {
+			const key = await ui.input("API key:", "");
+			if (key !== undefined && key !== "") {
+				pv.apiKey = name;
+				saveModels(providers);
+				saveAuth(name, key);
+				ui.notify(`API key updated`, "info");
+			}
+		} else if (action === "Manage models") {
+			await modelsLoop(ui, pv, providers);
+			saveModels(providers);
+			ui.notify(`Models updated for "${name}"`, "info");
+		} else if (action === "Remove provider") {
+			delete providers[name];
+			saveModels(providers);
+			ui.notify(`Provider "${name}" removed`, "info");
+			return;
+		}
+	}
 }
 
 /**
@@ -468,84 +547,80 @@ async function editProvider(
  * the parent menu, or void when done.
  */
 async function modelsLoop(
-  ui: ExtensionContext["ui"],
-  provider: ProviderEntry,
-  providers?: Record<string, ProviderEntry>,
+	ui: ExtensionContext["ui"],
+	provider: ProviderEntry,
+	providers?: Record<string, ProviderEntry>,
 ): Promise<"back" | void> {
-  while (true) {
-    const models = provider.models;
-    const choices = [
-      ...models.map((m) => m.id),
-      "+ Add model",
-      "< Back",
-    ];
+	while (true) {
+		const models = provider.models;
+		const choices = [...models.map((m) => m.id), "+ Add model", "< Back"];
 
-    const pick = await ui.select("Models:", choices);
-    if (!pick || pick === "< Back") return "back";
+		const pick = await ui.select("Models:", choices);
+		if (!pick || pick === "< Back") return "back";
 
-    if (pick === "+ Add model") {
-      const back = await addModelFlow(ui, provider, providers);
-      if (back === "back") continue;
-    } else {
-      const model = models.find((m) => m.id === pick);
-      if (!model) continue;
+		if (pick === "+ Add model") {
+			const back = await addModelFlow(ui, provider, providers);
+			if (back === "back") continue;
+		} else {
+			const model = models.find((m) => m.id === pick);
+			if (!model) continue;
 
-      const back = await modelEditFlow(ui, pick, model, provider, providers);
-      if (back === "continue") continue;
-    }
-  }
+			const back = await modelEditFlow(ui, pick, model, provider, providers);
+			if (back === "continue") continue;
+		}
+	}
 }
 
 /**
  * Add a new model interactively. Returns "back" if user cancels mid-flow.
  */
 async function addModelFlow(
-  ui: ExtensionContext["ui"],
-  provider: ProviderEntry,
-  providers?: Record<string, ProviderEntry>,
+	ui: ExtensionContext["ui"],
+	provider: ProviderEntry,
+	providers?: Record<string, ProviderEntry>,
 ): Promise<"back" | void> {
-  const id = await ui.input("Model ID:", "");
-  if (!id) return "back";
+	const id = await ui.input("Model ID:", "");
+	if (!id) return "back";
 
-  const displayName = await ui.input("Display name:", id);
-  if (displayName === undefined) return "back";
+	const displayName = await ui.input("Display name:", id);
+	if (displayName === undefined) return "back";
 
-  const ctxWindow = await ui.input("Context window:", "2000000");
-  if (ctxWindow === undefined) return "back";
+	const ctxWindow = await ui.input("Context window:", "2000000");
+	if (ctxWindow === undefined) return "back";
 
-  const maxOutput = await ui.input("Max output tokens:", "1000000000");
-  if (maxOutput === undefined) return "back";
+	const maxOutput = await ui.input("Max output tokens:", "1000000000");
+	if (maxOutput === undefined) return "back";
 
-  const reasoningPick = await ui.select("Supports reasoning?", ["Yes", "No"]);
-  if (!reasoningPick) return "back";
+	const reasoningPick = await ui.select("Supports reasoning?", ["Yes", "No"]);
+	if (!reasoningPick) return "back";
 
-  provider.models.push({
-    id,
-    name: displayName || id,
-    contextWindow: parseInt(ctxWindow || "2000000", 10),
-    maxTokens: parseInt(maxOutput || "1000000000", 10),
-    reasoning: reasoningPick === "Yes",
-    input: ["text"],
-  });
+	provider.models.push({
+		id,
+		name: displayName || id,
+		contextWindow: parseInt(ctxWindow || "2000000", 10),
+		maxTokens: parseInt(maxOutput || "1000000000", 10),
+		reasoning: reasoningPick === "Yes",
+		input: ["text"],
+	});
 
-  ui.notify(`Added: ${id}`, "info");
+	ui.notify(`Added: ${id}`, "info");
 
-  // Offer to set as default immediately
-  if (providers) {
-    const setDefault = await ui.select("Set as default model?", ["Yes", "No"]);
-    if (setDefault === "Yes") {
-      const settings = loadJson(SETTINGS_FILE);
-      for (const [pn, pv] of Object.entries(providers)) {
-        if (pv === provider) {
-          settings.defaultProvider = pn;
-          break;
-        }
-      }
-      settings.defaultModel = id;
-      saveJson(SETTINGS_FILE, settings);
-      ui.notify(`Default model set: ${id}`, "info");
-    }
-  }
+	// Offer to set as default immediately
+	if (providers) {
+		const setDefault = await ui.select("Set as default model?", ["Yes", "No"]);
+		if (setDefault === "Yes") {
+			const settings = loadJson(SETTINGS_FILE);
+			for (const [pn, pv] of Object.entries(providers)) {
+				if (pv === provider) {
+					settings.defaultProvider = pn;
+					break;
+				}
+			}
+			settings.defaultModel = id;
+			saveJson(SETTINGS_FILE, settings);
+			ui.notify(`Default model set: ${id}`, "info");
+		}
+	}
 }
 
 /**
@@ -553,62 +628,68 @@ async function addModelFlow(
  * or "continue" to stay in the models loop.
  */
 async function modelEditFlow(
-  ui: ExtensionContext["ui"],
-  pick: string,
-  model: ProviderEntry["models"][number],
-  provider: ProviderEntry,
-  providers?: Record<string, ProviderEntry>,
+	ui: ExtensionContext["ui"],
+	pick: string,
+	model: ProviderEntry["models"][number],
+	provider: ProviderEntry,
+	providers?: Record<string, ProviderEntry>,
 ): Promise<"back" | "continue"> {
-  const editChoices = ["Edit", "Remove"];
-  if (providers) editChoices.push("Set as default");
-  editChoices.push("< Back");
+	const editChoices = ["Edit", "Remove"];
+	if (providers) editChoices.push("Set as default");
+	editChoices.push("< Back");
 
-  const action = await ui.select(`${pick}:`, editChoices);
-  if (!action || action === "< Back") return "back";
+	const action = await ui.select(`${pick}:`, editChoices);
+	if (!action || action === "< Back") return "back";
 
-  if (action === "Edit") {
-    const displayName = await ui.input("Display name:", model.name);
-    const ctxWindow = await ui.input("Context window:", String(model.contextWindow));
-    const maxOutput = await ui.input("Max output tokens:", String(model.maxTokens));
-    const reasoningPick = await ui.select("Supports reasoning?", ["Yes", "No"]);
+	if (action === "Edit") {
+		const displayName = await ui.input("Display name:", model.name);
+		const ctxWindow = await ui.input(
+			"Context window:",
+			String(model.contextWindow),
+		);
+		const maxOutput = await ui.input(
+			"Max output tokens:",
+			String(model.maxTokens),
+		);
+		const reasoningPick = await ui.select("Supports reasoning?", ["Yes", "No"]);
 
-    model.name = displayName || pick;
-    model.contextWindow = parseInt(ctxWindow ?? "0", 10);
-    model.maxTokens = parseInt(maxOutput ?? "0", 10);
-    model.reasoning = reasoningPick === "Yes";
-    ui.notify(`Updated: ${pick}`, "info");
-  } else if (action === "Remove") {
-    provider.models = provider.models.filter((m) => m.id !== pick);
-    ui.notify(`Removed: ${pick}`, "info");
-  } else if (action === "Set as default" && providers) {
-    const settings = loadJson(SETTINGS_FILE);
-    for (const [pn, pv] of Object.entries(providers)) {
-      if (pv === provider) {
-        settings.defaultProvider = pn;
-        break;
-      }
-    }
-    settings.defaultModel = model.id;
-    saveJson(SETTINGS_FILE, settings);
-    ui.notify(`Default model set: ${model.id}`, "info");
-  }
+		model.name = displayName || pick;
+		model.contextWindow = parseInt(ctxWindow ?? "0", 10);
+		model.maxTokens = parseInt(maxOutput ?? "0", 10);
+		model.reasoning = reasoningPick === "Yes";
+		ui.notify(`Updated: ${pick}`, "info");
+	} else if (action === "Remove") {
+		provider.models = provider.models.filter((m) => m.id !== pick);
+		ui.notify(`Removed: ${pick}`, "info");
+	} else if (action === "Set as default" && providers) {
+		const settings = loadJson(SETTINGS_FILE);
+		for (const [pn, pv] of Object.entries(providers)) {
+			if (pv === provider) {
+				settings.defaultProvider = pn;
+				break;
+			}
+		}
+		settings.defaultModel = model.id;
+		saveJson(SETTINGS_FILE, settings);
+		ui.notify(`Default model set: ${model.id}`, "info");
+	}
 
-  return "continue";
+	return "continue";
 }
 
 function saveModels(providers: Record<string, ProviderEntry>) {
-  saveJson(MODELS_FILE, { providers });
+	saveJson(MODELS_FILE, { providers });
 }
 
 function saveAuth(providerName: string, key: string) {
-  const auth = loadJson(AUTH_FILE);
-  // Escape $ as $$ so Pi's resolveConfigValue doesn't try to
-  // interpolate $VAR references in raw API keys.  Pi v0.76+
-  // treats $ as an env-var interpolation prefix; $$ is the
-  // escape sequence for a literal $.
-  // Arrow function is required: String.replace treats $$ in a string
-  // replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
-  const escapedKey = key.replace(/\$/g, () => "$$");
-  auth[providerName] = { type: "api_key", key: escapedKey };
-  saveJson(AUTH_FILE, auth);
+	const auth = loadJson(AUTH_FILE);
+	// Escape $ as $$ so Pi's resolveConfigValue doesn't try to
+	// interpolate $VAR references in raw API keys.  Pi v0.76+
+	// treats $ as an env-var interpolation prefix; $$ is the
+	// escape sequence for a literal $.
+	// Arrow function is required: String.replace treats $$ in a string
+	// replacement as a literal $, so .replace(/\$/g, "$$") is a no-op.
+	const escapedKey = key.replace(/\$/g, () => "$$");
+	auth[providerName] = { type: "api_key", key: escapedKey };
+	saveJson(AUTH_FILE, auth);
 }

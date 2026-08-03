@@ -71,10 +71,11 @@ fi
 echo "[deploy] git tree clean."
 
 # --- 2. full gate -------------------------------------------------------------
-echo "[deploy] running gate: build + test + typecheck + regression_check"
+echo "[deploy] running gate: build + test + typecheck + regression_check + audit"
 npm test
 npm run typecheck
 python3 scripts/regression_check.py --all
+node scripts/audit-gate.mjs
 echo "[deploy] gate green."
 
 # --- 3. build the React dashboard --------------------------------------------

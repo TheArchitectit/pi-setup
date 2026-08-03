@@ -8,26 +8,30 @@
 import type { TabId } from "../tabs/registry";
 
 export interface TabBarProps {
-  tabs: ReadonlyArray<{ id: TabId; label: string }>;
-  active: TabId;
-  onTabChange: (id: TabId) => void;
+	tabs: ReadonlyArray<{ id: TabId; label: string }>;
+	active: TabId;
+	onTabChange: (id: TabId) => void;
 }
 
-export function TabBar({ tabs, active, onTabChange }: TabBarProps): React.ReactElement {
-  return (
-    <nav className="tab-bar" role="tablist">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={active === tab.id}
-          className={active === tab.id ? "active" : ""}
-          onClick={() => onTabChange(tab.id)}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </nav>
-  );
+export function TabBar({
+	tabs,
+	active,
+	onTabChange,
+}: TabBarProps): React.ReactElement {
+	return (
+		<nav className="tab-bar" role="tablist">
+			{tabs.map((tab) => (
+				<button
+					key={tab.id}
+					type="button"
+					role="tab"
+					aria-selected={active === tab.id}
+					className={active === tab.id ? "active" : ""}
+					onClick={() => onTabChange(tab.id)}
+				>
+					{tab.label}
+				</button>
+			))}
+		</nav>
+	);
 }

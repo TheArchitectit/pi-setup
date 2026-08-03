@@ -34,9 +34,7 @@ import os from "node:os";
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
 const DIST = join(ROOT, "dist");
 
-const PER_FILE_TIMEOUT_MS = Number(
-	process.env.PISETUP_TEST_TIMEOUT ?? 120_000,
-);
+const PER_FILE_TIMEOUT_MS = Number(process.env.PISETUP_TEST_TIMEOUT ?? 120_000);
 const HARD_CAP_MS = PER_FILE_TIMEOUT_MS + 10_000;
 const SILENCE_MS = Number(process.env.PISETUP_TEST_HANG_MS ?? 10_000);
 const POOL = Math.max(
@@ -81,7 +79,9 @@ function sweepStaleTmpDirs() {
 			}
 		}
 		if (swept > 0) {
-			console.error(`sweeper: swept ${swept} stale test dirs (~${Math.round(freedMB)} MB freed)`);
+			console.error(
+				`sweeper: swept ${swept} stale test dirs (~${Math.round(freedMB)} MB freed)`,
+			);
 		}
 	} catch {
 		// non-fatal: sweeper is best-effort, never break the runner
@@ -101,11 +101,17 @@ function dirSizeMB(dirPath) {
 				if (c.isDirectory()) {
 					stack.push(p);
 				} else {
-					try { bytes += statSync(p).size; } catch { /* skip */ }
+					try {
+						bytes += statSync(p).size;
+					} catch {
+						/* skip */
+					}
 				}
 			}
 		}
-	} catch { /* non-fatal */ }
+	} catch {
+		/* non-fatal */
+	}
 	return bytes / (1024 * 1024);
 }
 
@@ -180,8 +186,11 @@ function runOne(file) {
 		};
 		const silenceTimer = setInterval(() => {
 			if (tapDone || child.killed) return;
-			if (startedCount > 0 && startedCount === completedCount &&
-				Date.now() - lastOutputAt > SILENCE_MS) {
+			if (
+				startedCount > 0 &&
+				startedCount === completedCount &&
+				Date.now() - lastOutputAt > SILENCE_MS
+			) {
 				child.kill("SIGKILL");
 			}
 		}, 1000);
@@ -234,7 +243,7 @@ function runOne(file) {
 					.join("  "),
 			});
 		};
-		let closeCode ;
+		let closeCode;
 		let drainTimer;
 		const checkDrain = () => {
 			if (closeCode === undefined) return;
@@ -244,13 +253,22 @@ function runOne(file) {
 			}
 		};
 		child.on("close", (code) => {
-			if (code === null) { tryResolve(code, true); return; }
+			if (code === null) {
+				tryResolve(code, true);
+				return;
+			}
 			closeCode = code;
 			drainTimer = setTimeout(() => tryResolve(code, true), 1000);
 			checkDrain();
 		});
-		child.stdout.on("end", () => { stdoutEnded = true; checkDrain(); });
-		child.stderr.on("end", () => { stderrEnded = true; checkDrain(); });
+		child.stdout.on("end", () => {
+			stdoutEnded = true;
+			checkDrain();
+		});
+		child.stderr.on("end", () => {
+			stderrEnded = true;
+			checkDrain();
+		});
 	});
 }
 

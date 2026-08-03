@@ -15,11 +15,11 @@
 
 // ─── Domain types (re-exported from types.ts — the canonical home) ───────────
 export type {
-  ProviderEntry,
-  SettingsSnapshot,
-  AuthEntry,
-  DashboardLink,
-  SetupSnapshot,
+	ProviderEntry,
+	SettingsSnapshot,
+	AuthEntry,
+	DashboardLink,
+	SetupSnapshot,
 } from "../types.js";
 
 // ─── Endpoint machinery ─────────────────────────────────────────────────────
@@ -29,11 +29,11 @@ export type HttpMethod = "GET" | "PUT" | "POST";
 
 /** Generic definition for a dashboard API endpoint. */
 export interface EndpointDef {
-  readonly method: HttpMethod;
-  /** URL path beginning with `/api/`. */
-  readonly path: string;
-  /** Human-readable summary. */
-  readonly description: string;
+	readonly method: HttpMethod;
+	/** URL path beginning with `/api/`. */
+	readonly path: string;
+	/** Human-readable summary. */
+	readonly description: string;
 }
 
 // ─── Response shapes ────────────────────────────────────────────────────────
@@ -42,19 +42,19 @@ import type { DashboardLink } from "../types.js";
 
 /** GET /api/version — server version for stale-server detection. */
 export interface VersionResponse {
-  version: string;
+	version: string;
 }
 
 /** GET /api/links — cross-link API (sibling dashboards). */
 export interface LinksResponse {
-  links: DashboardLink[];
+	links: DashboardLink[];
 }
 
 /** GET /api/health — liveness probe. */
 export interface HealthResponse {
-  ok: true;
-  serverVersion: string;
-  uptimeMs: number;
+	ok: true;
+	serverVersion: string;
+	uptimeMs: number;
 }
 
 // ─── ENDPOINTS registry ─────────────────────────────────────────────────────
@@ -64,24 +64,24 @@ export interface HealthResponse {
  * from the same constant so the two can never drift.
  */
 export const ENDPOINTS = {
-  version: {
-    method: "GET" as const,
-    path: "/api/version",
-    description: "Server package version (stale-server detection).",
-  },
-  snapshot: {
-    method: "GET" as const,
-    path: "/api/snapshot",
-    description: "Full config snapshot (providers, settings, auth, links).",
-  },
-  links: {
-    method: "GET" as const,
-    path: "/api/links",
-    description: "Cross-links to sibling pi dashboards.",
-  },
-  health: {
-    method: "GET" as const,
-    path: "/api/health",
-    description: "Liveness probe (ok / version / uptime).",
-  },
+	version: {
+		method: "GET" as const,
+		path: "/api/version",
+		description: "Server package version (stale-server detection).",
+	},
+	snapshot: {
+		method: "GET" as const,
+		path: "/api/snapshot",
+		description: "Full config snapshot (providers, settings, auth, links).",
+	},
+	links: {
+		method: "GET" as const,
+		path: "/api/links",
+		description: "Cross-links to sibling pi dashboards.",
+	},
+	health: {
+		method: "GET" as const,
+		path: "/api/health",
+		description: "Liveness probe (ok / version / uptime).",
+	},
 } as const satisfies Record<string, EndpointDef>;

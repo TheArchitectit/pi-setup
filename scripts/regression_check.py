@@ -39,7 +39,13 @@ DEFAULT_RULES_PATH = Path(".guardrails/prevention-rules")
 # EXT_SOFT/EXT_HARD tuned so the current ~614-line setup.ts passes while still
 # catching runaway growth; tests get a higher ceiling.
 FILE_SIZE_DIRS = ("extensions",)
-FILE_SIZE_SKIP_PARTS = ("node_modules", "dist", ".claude", "worktrees", "dashboard-client")
+FILE_SIZE_SKIP_PARTS = (
+    "node_modules",
+    "dist",
+    ".claude",
+    "worktrees",
+    "dashboard-client",
+)
 FILE_SIZE_SKIP_SUFFIXES = (".d.ts",)
 EXT_SOFT = 400
 EXT_HARD = 700
@@ -94,23 +100,27 @@ def check_file_sizes(repo_root: Path) -> list[dict]:
                 except OSError:
                     continue
                 if line_count > hard:
-                    violations.append({
-                        "file": rel_path,
-                        "lines": line_count,
-                        "soft": soft,
-                        "hard": hard,
-                        "severity": "error",
-                        "kind": "hard",
-                    })
+                    violations.append(
+                        {
+                            "file": rel_path,
+                            "lines": line_count,
+                            "soft": soft,
+                            "hard": hard,
+                            "severity": "error",
+                            "kind": "hard",
+                        }
+                    )
                 elif soft is not None and line_count > soft:
-                    warnings.append({
-                        "file": rel_path,
-                        "lines": line_count,
-                        "soft": soft,
-                        "hard": hard,
-                        "severity": "warning",
-                        "kind": "soft",
-                    })
+                    warnings.append(
+                        {
+                            "file": rel_path,
+                            "lines": line_count,
+                            "soft": soft,
+                            "hard": hard,
+                            "severity": "warning",
+                            "kind": "soft",
+                        }
+                    )
 
     violations.sort(key=lambda d: d["lines"], reverse=True)
     warnings.sort(key=lambda d: d["lines"], reverse=True)
@@ -133,11 +143,15 @@ def print_file_size_report(size_issues: list[dict]) -> None:
     for issue in size_issues:
         severity = format_severity(issue["severity"])
         tag = "OVER HARD LIMIT" if issue["kind"] == "hard" else "over soft limit"
-        print(f"  {severity}  {issue['file']}  ({issue['lines']} lines, "
-              f"limit {issue['hard'] if issue['kind'] == 'hard' else issue['soft']})  {tag}")
+        print(
+            f"  {severity}  {issue['file']}  ({issue['lines']} lines, "
+            f"limit {issue['hard'] if issue['kind'] == 'hard' else issue['soft']})  {tag}"
+        )
 
     print("-" * 70)
-    print(f"  {hard_count} over hard limit (blocks commit), {soft_count} over soft limit (warning)")
+    print(
+        f"  {hard_count} over hard limit (blocks commit), {soft_count} over soft limit (warning)"
+    )
     print("=" * 70)
 
 
@@ -145,10 +159,7 @@ def run_git_command(args: list[str]) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
     try:
         result = subprocess.run(
-            ["git"] + args,
-            capture_output=True,
-            text=True,
-            cwd=Path.cwd()
+            ["git"] + args, capture_output=True, text=True, cwd=Path.cwd()
         )
         return result.returncode, result.stdout, result.stderr
     except FileNotFoundError:
@@ -217,7 +228,9 @@ def validate_rule_regex(rule: dict) -> bool:
         try:
             re.compile(forbidden)
         except re.error as e:
-            print(f"Warning: Invalid forbidden_context in rule {rule.get('rule_id')}: {e}")
+            print(
+                f"Warning: Invalid forbidden_context in rule {rule.get('rule_id')}: {e}"
+            )
             return False
 
     return True
@@ -255,10 +268,7 @@ def load_prevention_rules(rules_path: Path) -> list[dict]:
     return rules
 
 
-def check_file_against_failures(
-    file_path: str,
-    failures: list[dict]
-) -> list[dict]:
+def check_file_against_failures(file_path: str, failures: list[dict]) -> list[dict]:
     """Check if file is in affected_files of any active failure."""
     matching_failures = []
 
@@ -272,10 +282,7 @@ def check_file_against_failures(
     return matching_failures
 
 
-def check_diff_against_patterns(
-    diff_content: str,
-    rules: list[dict]
-) -> list[dict]:
+def check_diff_against_patterns(diff_content: str, rules: list[dict]) -> list[dict]:
     """Check diff content against pattern rules."""
     violations = []
 
@@ -301,14 +308,16 @@ def check_diff_against_patterns(
                 if forbidden and re.search(forbidden, added_content, re.MULTILINE):
                     continue  # Context suggests this is OK
 
-                violations.append({
-                    "rule_id": rule.get("rule_id"),
-                    "name": rule.get("name"),
-                    "message": rule.get("message"),
-                    "severity": rule.get("severity", "warning"),
-                    "suggestion": rule.get("suggestion"),
-                    "failure_id": rule.get("failure_id"),
-                })
+                violations.append(
+                    {
+                        "rule_id": rule.get("rule_id"),
+                        "name": rule.get("name"),
+                        "message": rule.get("message"),
+                        "severity": rule.get("severity", "warning"),
+                        "suggestion": rule.get("suggestion"),
+                        "failure_id": rule.get("failure_id"),
+                    }
+                )
         except re.error:
             continue  # Invalid regex, skip
 
@@ -319,9 +328,9 @@ def format_severity(severity: str) -> str:
     """Format severity with color codes (if terminal supports it)."""
     colors = {
         "critical": "\033[91m",  # Red
-        "high": "\033[93m",      # Yellow
-        "medium": "\033[94m",    # Blue
-        "low": "\033[90m",       # Gray
+        "high": "\033[93m",  # Yellow
+        "medium": "\033[94m",  # Blue
+        "low": "\033[90m",  # Gray
         "error": "\033[91m",
         "warning": "\033[93m",
     }
@@ -337,7 +346,7 @@ def run_regression_check(
     rules_path: Path,
     staged: bool = True,
     unstaged: bool = False,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> tuple[int, list[dict]]:
     """
     Run full regression check.
@@ -404,7 +413,9 @@ def print_report(issues: list[dict], verbose: bool = False):
             print(f"\n  ⚠️  {severity} - Known Bug History")
             print(f"      Failure ID: {failure['failure_id']}")
             print(f"      Category: {failure.get('category', 'unknown')}")
-            print(f"      Previous Error: {failure.get('error_message', 'N/A')[:80]}...")
+            print(
+                f"      Previous Error: {failure.get('error_message', 'N/A')[:80]}..."
+            )
             print(f"      Prevention: {failure.get('prevention_rule', 'N/A')}")
 
         for violation in issue["violations"]:
@@ -433,34 +444,55 @@ Examples:
     %(prog)s --unstaged         # Check unstaged changes
     %(prog)s --all              # Check all changes
     %(prog)s --pre-commit       # Exit with non-zero code if issues found
-        """
+        """,
     )
 
-    parser.add_argument("--registry", "-r", type=Path,
-                        default=Path(os.getenv("FAILURE_REGISTRY_PATH", DEFAULT_REGISTRY_PATH)),
-                        help="Path to failure registry")
-    parser.add_argument("--rules", type=Path,
-                        default=Path(os.getenv("PREVENTION_RULES_PATH", DEFAULT_RULES_PATH)),
-                        help="Path to prevention rules directory")
+    parser.add_argument(
+        "--registry",
+        "-r",
+        type=Path,
+        default=Path(os.getenv("FAILURE_REGISTRY_PATH", DEFAULT_REGISTRY_PATH)),
+        help="Path to failure registry",
+    )
+    parser.add_argument(
+        "--rules",
+        type=Path,
+        default=Path(os.getenv("PREVENTION_RULES_PATH", DEFAULT_RULES_PATH)),
+        help="Path to prevention rules directory",
+    )
 
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--staged", action="store_true", default=True,
-                       help="Check staged changes (default)")
-    group.add_argument("--unstaged", "-u", action="store_true",
-                       help="Check unstaged changes")
-    group.add_argument("--all", "-a", action="store_true",
-                       help="Check both staged and unstaged changes")
+    group.add_argument(
+        "--staged",
+        action="store_true",
+        default=True,
+        help="Check staged changes (default)",
+    )
+    group.add_argument(
+        "--unstaged", "-u", action="store_true", help="Check unstaged changes"
+    )
+    group.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help="Check both staged and unstaged changes",
+    )
 
-    parser.add_argument("--pre-commit", action="store_true",
-                        help="Exit with non-zero code if issues found (for pre-commit hooks)")
-    parser.add_argument("--json", action="store_true",
-                        help="Output results as JSON")
-    parser.add_argument("--no-file-sizes", action="store_true",
-                        help="Skip the file-size scan of extensions/")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Verbose output")
-    parser.add_argument("--quiet", "-q", action="store_true",
-                        help="Only output on issues found")
+    parser.add_argument(
+        "--pre-commit",
+        action="store_true",
+        help="Exit with non-zero code if issues found (for pre-commit hooks)",
+    )
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    parser.add_argument(
+        "--no-file-sizes",
+        action="store_true",
+        help="Skip the file-size scan of extensions/",
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--quiet", "-q", action="store_true", help="Only output on issues found"
+    )
 
     args = parser.parse_args()
 
@@ -474,7 +506,7 @@ Examples:
         rules_path=args.rules,
         staged=staged,
         unstaged=unstaged,
-        verbose=args.verbose and not args.quiet
+        verbose=args.verbose and not args.quiet,
     )
 
     size_issues: list[dict] = []
@@ -484,12 +516,17 @@ Examples:
         size_hard_count = sum(1 for i in size_issues if i["kind"] == "hard")
 
     if args.json:
-        print(json.dumps({
-            "issue_count": count,
-            "size_violations_hard": size_hard_count,
-            "issues": issues,
-            "file_sizes": size_issues,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "issue_count": count,
+                    "size_violations_hard": size_hard_count,
+                    "issues": issues,
+                    "file_sizes": size_issues,
+                },
+                indent=2,
+            )
+        )
     else:
         if not args.quiet or count > 0:
             print_report(issues, verbose=args.verbose)

@@ -11,12 +11,12 @@ import { Settings, Server } from "lucide-react";
 export type TabId = "setup" | "providers";
 
 export interface TabDef {
-  id: TabId;
-  label: string;
-  icon: LucideIcon;
+	id: TabId;
+	label: string;
+	icon: LucideIcon;
 }
 
 export const PRIMARY_TABS: readonly TabDef[] = [
-  { id: "setup", label: "Setup", icon: Settings },
-  { id: "providers", label: "Providers", icon: Server },
+	{ id: "setup", label: "Setup", icon: Settings },
+	{ id: "providers", label: "Providers", icon: Server },
 ];

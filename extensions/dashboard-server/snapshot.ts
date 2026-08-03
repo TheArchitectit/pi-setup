@@ -12,75 +12,78 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import type { SetupSnapshot, ProviderEntry, SettingsSnapshot, AuthEntry, DashboardLink } from "./types.js";
+import type {
+	SetupSnapshot,
+	ProviderEntry,
+	SettingsSnapshot,
+	AuthEntry,
+	DashboardLink,
+} from "./types.js";
 
-const PI_DIR = join(homedir(), ".pi", "agent");
-const MODELS_FILE = join(PI_DIR, "models.json");
-const SETTINGS_FILE = join(PI_DIR, "settings.json");
-const AUTH_FILE = join(PI_DIR, "auth.json");
+const DEFAULT_PI_DIR = join(homedir(), ".pi", "agent");
 
 function loadJson(path: string): Record<string, unknown> {
-  try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
+	try {
+		return JSON.parse(readFileSync(path, "utf-8"));
+	} catch {
+		return {};
+	}
 }
 
-export function readProviders(): Record<string, ProviderEntry> {
-  const data = loadJson(MODELS_FILE);
-  // models.json has shape { providers: { name: { ... } } }
-  const root = (data.providers ?? data) as Record<string, unknown>;
-  const providers: Record<string, ProviderEntry> = {};
-  for (const [name, entry] of Object.entries(root)) {
-    if (!entry || typeof entry !== "object") continue;
-    const pv = entry as Record<string, unknown>;
-    providers[name] = {
-      baseUrl: String(pv.baseUrl ?? ""),
-      api: String(pv.api ?? ""),
-      apiKey: pv.apiKey ? "***" : undefined,
-      compat: pv.compat as { supportsDeveloperRole?: boolean } | undefined,
-      models: Array.isArray(pv.models)
-        ? (pv.models as Array<Record<string, unknown>>).map((m) => ({
-            id: String(m.id ?? ""),
-            name: String(m.name ?? m.id ?? ""),
-            contextWindow: Number(m.contextWindow ?? 0),
-            maxTokens: Number(m.maxTokens ?? 0),
-            reasoning: Boolean(m.reasoning ?? false),
-            input: Array.isArray(m.input) ? (m.input as string[]) : [],
-            compat: m.compat as { supportsDeveloperRole?: boolean } | undefined,
-          }))
-        : [],
-    };
-  }
-  return providers;
+export function readProviders(piDir: string = DEFAULT_PI_DIR): Record<string, ProviderEntry> {
+	const data = loadJson(join(piDir, "models.json"));
+	// models.json has shape { providers: { name: { ... } } }
+	const root = (data.providers ?? data) as Record<string, unknown>;
+	const providers: Record<string, ProviderEntry> = {};
+	for (const [name, entry] of Object.entries(root)) {
+		if (!entry || typeof entry !== "object") continue;
+		const pv = entry as Record<string, unknown>;
+		providers[name] = {
+			baseUrl: String(pv.baseUrl ?? ""),
+			api: String(pv.api ?? ""),
+			apiKey: pv.apiKey ? "***" : undefined,
+			compat: pv.compat as { supportsDeveloperRole?: boolean } | undefined,
+			models: Array.isArray(pv.models)
+				? (pv.models as Array<Record<string, unknown>>).map((m) => ({
+						id: String(m.id ?? ""),
+						name: String(m.name ?? m.id ?? ""),
+						contextWindow: Number(m.contextWindow ?? 0),
+						maxTokens: Number(m.maxTokens ?? 0),
+						reasoning: Boolean(m.reasoning ?? false),
+						input: Array.isArray(m.input) ? (m.input as string[]) : [],
+						compat: m.compat as { supportsDeveloperRole?: boolean } | undefined,
+					}))
+				: [],
+		};
+	}
+	return providers;
 }
 
-export function readSettings(): SettingsSnapshot | null {
-  const data = loadJson(SETTINGS_FILE);
-  if (!data || Object.keys(data).length === 0) return null;
-  return {
-    defaultProvider: String(data.defaultProvider ?? ""),
-    defaultModel: String(data.defaultModel ?? ""),
-    defaultThinkingLevel: String(data.defaultThinkingLevel ?? ""),
-    theme: String(data.theme ?? ""),
-    hideThinkingBlock: Boolean(data.hideThinkingBlock ?? false),
-    packages: Array.isArray(data.packages) ? (data.packages as string[]) : [],
-  };
+export function readSettings(piDir: string = DEFAULT_PI_DIR): SettingsSnapshot | null {
+	const data = loadJson(join(piDir, "settings.json"));
+	if (!data || Object.keys(data).length === 0) return null;
+	return {
+		defaultProvider: String(data.defaultProvider ?? ""),
+		defaultModel: String(data.defaultModel ?? ""),
+		defaultThinkingLevel: String(data.defaultThinkingLevel ?? ""),
+		theme: String(data.theme ?? ""),
+		hideThinkingBlock: Boolean(data.hideThinkingBlock ?? false),
+		packages: Array.isArray(data.packages) ? (data.packages as string[]) : [],
+	};
 }
 
-export function readAuth(): Record<string, AuthEntry> {
-  const data = loadJson(AUTH_FILE);
-  const auth: Record<string, AuthEntry> = {};
-  for (const [name, entry] of Object.entries(data)) {
-    if (!entry || typeof entry !== "object") continue;
-    const e = entry as Record<string, unknown>;
-    auth[name] = {
-      type: String(e.type ?? ""),
-      hasKey: Boolean(e.key),
-    };
-  }
-  return auth;
+export function readAuth(piDir: string = DEFAULT_PI_DIR): Record<string, AuthEntry> {
+	const data = loadJson(join(piDir, "auth.json"));
+	const auth: Record<string, AuthEntry> = {};
+	for (const [name, entry] of Object.entries(data)) {
+		if (!entry || typeof entry !== "object") continue;
+		const e = entry as Record<string, unknown>;
+		auth[name] = {
+			type: String(e.type ?? ""),
+			hasKey: Boolean(e.key),
+		};
+	}
+	return auth;
 }
 
 /**
@@ -88,44 +91,45 @@ export function readAuth(): Record<string, AuthEntry> {
  * Currently checks for mega-compact on port 9320.
  */
 export async function detectSiblingDashboards(): Promise<DashboardLink[]> {
-  const links: DashboardLink[] = [];
+	const links: DashboardLink[] = [];
 
-  // mega-compact dashboard: port 9320–9329
-  for (let port = 9320; port <= 9329; port++) {
-    try {
-      const res = await fetch(`http://localhost:${port}/api/version`, {
-        signal: AbortSignal.timeout(800),
-      });
-      if (res.ok) {
-        links.push({
-          name: "pi-mega-compact",
-          url: `http://localhost:${port}`,
-          port,
-          kind: "mega-compact",
-          alive: true,
-        });
-        break; // first live one wins
-      }
-    } catch {
-      // not on this port
-    }
-  }
+	// mega-compact dashboard: port 9320–9329
+	for (let port = 9320; port <= 9329; port++) {
+		try {
+			const res = await fetch(`http://localhost:${port}/api/version`, {
+				signal: AbortSignal.timeout(800),
+			});
+			if (res.ok) {
+				links.push({
+					name: "pi-mega-compact",
+					url: `http://localhost:${port}`,
+					port,
+					kind: "mega-compact",
+					alive: true,
+				});
+				break; // first live one wins
+			}
+		} catch {
+			// not on this port
+		}
+	}
 
-  return links;
+	return links;
 }
 
 export function readSnapshot(
-  _snapshotPath: string,
-  serverVersion: string,
-  links: DashboardLink[],
+	_snapshotPath: string,
+	serverVersion: string,
+	links: DashboardLink[],
+	piDir: string = DEFAULT_PI_DIR,
 ): SetupSnapshot {
-  return {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    providers: readProviders(),
-    settings: readSettings(),
-    auth: readAuth(),
-    links,
-    serverVersion,
-  };
+	return {
+		version: 1,
+		updatedAt: new Date().toISOString(),
+		providers: readProviders(piDir),
+		settings: readSettings(piDir),
+		auth: readAuth(piDir),
+		links,
+		serverVersion,
+	};
 }
