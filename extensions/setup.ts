@@ -6,8 +6,10 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, unlinkSync } from "node:fs";
+import { join, dirname, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawn, execSync } from "node:child_process";
 
 const PI_DIR = join(process.env.HOME ?? "~", ".pi", "agent");
 const MODELS_FILE = join(PI_DIR, "models.json");
@@ -230,6 +232,131 @@ export default function (pi: ExtensionAPI) {
       // ── Apply providers to current session ──
       applyProviders(pi, providers);
       if (step === "") ui.notify("Setup complete", "info");
+    },
+  });
+
+  // ── /dashboard command ──────────────────────────────────────────────────
+  // Spawns a localhost web dashboard (port 9330–9339) showing provider/model
+  // config, auth status, installed packages, and cross-links to sibling
+  // dashboards (e.g. pi-mega-compact on port 9320).
+  const DASH_BASE = 9330;
+  const stateDir = join(PI_DIR, "extensions", "pi-setup-dashboard");
+  const portFile = join(stateDir, "port.pid");
+  const runnerFile = join(stateDir, "_dashboard-runner.mjs");
+
+  async function findLiveDashboardPort(): Promise<number | null> {
+    for (let port = DASH_BASE; port <= DASH_BASE + 9; port++) {
+      try {
+        const res = await fetch(`http://localhost:${port}/api/version`, {
+          signal: AbortSignal.timeout(800),
+        });
+        if (res.ok) return port;
+      } catch {
+        /* not on this port */
+      }
+    }
+    return null;
+  }
+
+  pi.registerCommand("dashboard", {
+    description: "Open the pi-setup web dashboard (localhost:9330)",
+    handler: async (_args, ctx) => {
+      // Check for existing live server
+      const existingPort = await findLiveDashboardPort();
+      if (existingPort) {
+        const url = `http://localhost:${existingPort}`;
+        ctx.ui.notify(`Dashboard already running: ${url}`, "info");
+        try {
+          execSync(`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`);
+        } catch {
+          /* non-fatal */
+        }
+        return;
+      }
+
+      // Spawn the dashboard server
+      try {
+        mkdirSync(stateDir, { recursive: true });
+
+        // Resolve the dashboard-server entry point
+        const here = dirname(fileURLToPath(import.meta.url));
+        const candidates = [
+          join(here, "dashboard-server", "server.ts"),
+          join(here, "..", "dist", "extensions", "dashboard-server", "server.js"),
+          join(here, "dashboard-server", "server.js"),
+        ];
+        const entry = candidates.find((p) => existsSync(p));
+        if (!entry) {
+          ctx.ui.notify("Dashboard server module not found", "error");
+          return;
+        }
+
+        // Write a runner that imports the entry point
+        const runner = `import { launchDashboardServer } from "${entry.replace(/\.ts$/, ".js")}";\nlaunchDashboardServer("${stateDir}").catch((e) => { console.error(e); process.exit(1); });\n`;
+        writeFileSync(runnerFile, runner);
+
+        const child = spawn(process.execPath, ["--experimental-strip-types", runnerFile, stateDir], {
+          stdio: "ignore",
+          detached: true,
+          env: { ...process.env, PI_SETUP_DASHBOARD_PORT: String(DASH_BASE) },
+        });
+
+        child.unref();
+
+        // Wait briefly for the server to start
+        let port: number | null = null;
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 300));
+          port = await findLiveDashboardPort();
+          if (port) break;
+        }
+
+        if (port) {
+          const url = `http://localhost:${port}`;
+          ctx.ui.notify(`Dashboard running: ${url}`, "info");
+          try {
+            execSync(`xdg-open ${url} 2>/dev/null || open ${url} 2>/dev/null || true`);
+          } catch {
+            /* non-fatal */
+          }
+        } else {
+          ctx.ui.notify("Dashboard failed to start — check logs", "error");
+        }
+      } catch (err) {
+        ctx.ui.notify(`Dashboard error: ${String(err)}`, "error");
+      }
+    },
+  });
+
+  pi.registerCommand("dashboard-stop", {
+    description: "Stop the pi-setup web dashboard",
+    handler: async (_args, ctx) => {
+      const port = await findLiveDashboardPort();
+      if (!port) {
+        ctx.ui.notify("Dashboard not running", "info");
+        return;
+      }
+      try {
+        // Read PID from port file or kill by port
+        if (existsSync(portFile)) {
+          const info = JSON.parse(readFileSync(portFile, "utf-8"));
+          if (info.pid) {
+            process.kill(info.pid, "SIGTERM");
+          }
+        } else {
+          // Fallback: find PID by port
+          try {
+            const out = execSync(`ss -ltnp 2>/dev/null | grep ':${port} '`, { encoding: "utf-8" });
+            const m = out.match(/pid=(\d+)/);
+            if (m) process.kill(Number(m[1]), "SIGTERM");
+          } catch {
+            /* ss not available */
+          }
+        }
+        ctx.ui.notify("Dashboard stopped", "info");
+      } catch (err) {
+        ctx.ui.notify(`Failed to stop: ${String(err)}`, "error");
+      }
     },
   });
 }

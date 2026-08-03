@@ -4,13 +4,16 @@ Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the m
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
 
-> **Status:** Alpha (v0.0.6-alpha.6) — API may change between releases.
+Includes a web dashboard for monitoring your pi configuration at a glance.
+
+> **Status:** v0.1.0 — Dashboard added, API may change between releases.
 
 ---
 
 ## Table of Contents
 
 - [Features](#features)
+- [Dashboard](#dashboard)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Extension Mode](#extension-mode)
@@ -41,6 +44,25 @@ Configure providers, models, thinking levels, and defaults through an interactiv
 - **Default model selection** — set your preferred model and thinking level
 - **Secure auth storage** — API key references saved with `0600` permissions
 - **Provider cleanup** — providers without valid auth keys are removed on exit
+
+## Dashboard
+
+The `/dashboard` command starts a localhost web UI (port 9330) that shows:
+
+- All configured providers with models, context windows, and reasoning support
+- Auth status (key presence, never the keys themselves)
+- Current defaults (provider, model, thinking level, theme)
+- Installed pi packages
+- Cross-links to sibling dashboards (e.g. pi-mega-compact on port 9320)
+
+```
+/dashboard        — start/open the dashboard
+/dashboard-stop   — stop the dashboard server
+```
+
+The dashboard auto-detects pi-mega-compact's dashboard (if running) and links to it. Both dashboards cross-link each other.
+
+See [dashboard-server/README.md](extensions/dashboard-server/README.md) for architecture details.
 
 ---
 

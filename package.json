@@ -1,7 +1,7 @@
 {
   "name": "pi-setup",
-  "version": "0.0.9",
-  "description": "Setup wizard for pi — configure providers, models, and defaults via /setup command",
+  "version": "0.1.0",
+  "description": "Setup wizard + dashboard for pi — configure providers, models, and defaults via /setup command, monitor config via /dashboard",
   "type": "module",
   "license": "MIT",
   "author": "TheArchitectit",
