@@ -1,5 +1,7 @@
 # pi-setup
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-TheArchitectit-FF69B4?style=flat&logo=github-sponsors)](https://github.com/sponsors/TheArchitectit)
+
 Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the minimal terminal coding harness.
 
 Configure providers, models, thinking levels, and defaults through an interactive UI or standalone shell script.
