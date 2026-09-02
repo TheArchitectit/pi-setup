@@ -1,5 +1,4 @@
 # pi-setup
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-FF69B4?style=flat&logo=github-sponsors)](https://github.com/sponsors/TheArchitectit)
 
 Setup wizard for [pi](https://github.com/mariozechner/pi-coding-agent) — the minimal terminal coding harness.
 
